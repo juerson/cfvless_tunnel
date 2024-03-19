@@ -1,12 +1,16 @@
 // src/worker.js
 import { connect } from "cloudflare:sockets";
-var userID;
-var proxyIP;
-var socks5Address;
-var showVless;
+var userID = "0648919d-8bf1-4d4c-8525-36cf487506ec";
+var proxyList = ["cdn-all.xn--b6gac.eu.org", "cdn.xn--b6gac.eu.org", "cdn-b100.xn--b6gac.eu.org", "edgetunnel.anycast.eu.org", "cdn.anycast.eu.org"];
+var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
+var socks5Address = "";
+var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
+var clash_template = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/4004dddd322e8f8696e92edf47ab520242393e30/clash_template";
+var configPassword = "";
+var subPassword = "";
 var domainList = [
   "https://www.iq.com",
-  "https://www.wechat.com",
+  "https://www.dell.com",
   "https://www.bilibili.com",
   "https://www.alibaba.com",
   "https://fmovies.llc/home",
@@ -18,16 +22,17 @@ var enableSocks = false;
 var worker_default = {
   /**
    * @param {import("@cloudflare/workers-types").Request} request
-   * @param {{UUID: string, PROXYIP: string, SOCKS5: string, SHOW_VLESS: string}} env
+   * @param {{UUID: string, PROXYIP: string, SOCKS5: string, CONFIG_PASSWORD: string, SUBSCRIPTIONS_PASSWORD: string}} env
    * @param {import("@cloudflare/workers-types").ExecutionContext} ctx
    * @returns {Promise<Response>}
    */
   async fetch(request, env, ctx) {
     try {
-      userID = env.UUID;
-      proxyIP = env.PROXYIP;
-      socks5Address = env.SOCKS5;
-      showVless = env.SHOW_VLESS;
+      userID = env.UUID || userID;
+      proxyIP = env.PROXYIP || proxyIP;
+      socks5Address = env.SOCKS5 || socks5Address;
+      configPassword = env.CONFIG_PASSWORD || configPassword;
+      subPassword = env.SUBSCRIPTIONS_PASSWORD || subPassword;
       if (proxyIP.includes(",")) {
         const arr = proxyIP.split(",");
         const randomIndex = Math.floor(Math.random() * arr.length);
@@ -58,8 +63,14 @@ var worker_default = {
               }
             });
             return redirectResponse;
-          case `/${userID}`: {
-            if (showVless === "on") {
+          case `/config`: {
+            const url3 = new URL(request.url);
+            let password2 = url3.searchParams.get("pwd") || "";
+            if (password2) {
+              password2 = encodeURIComponent(password2);
+              configPassword = encodeURIComponent(configPassword);
+            }
+            if (configPassword === password2) {
               const vlessConfig = getVLESSConfig(userID, request.headers.get("Host"));
               return new Response(`${vlessConfig}`, {
                 status: 200,
@@ -68,25 +79,77 @@ var worker_default = {
                 }
               });
             } else {
-              let uuid_page_messges = `\u60A8\u6CA1\u6709\u6743\u9650\u67E5\u770Bvless\u7684\u5206\u4EAB\u94FE\u63A5\u548C\u5BF9\u5E94\u7684clash-meta\u914D\u7F6E\u4FE1\u606F\uFF01\u8981\u67E5\u770Bvless\u7684\u5206\u4EAB\u94FE\u63A5\uFF0C\u9700\u8981\u5728Cloudflare\u7684"Workers \u548C Pages"\u540E\u53F0\uFF0C\u5C06\u8FD9\u4E2A\u9875\u9762\u7684\u5185\u5BB9\u663E\u793A\u51FA\u6765\uFF0C\u5177\u4F53\u6309\u4E0B\u9762\u7684\u6B65\u9AA4\u64CD\u4F5C\uFF1A
-
-1\u3001\u5982\u679C\u4F7F\u7528Workers\u90E8\u7F72\u7684\uFF1A
-  \u524D\u5F80\u60A8\u521B\u5EFA\u7684 Workers \u5E94\u7528\u7A0B\u5E8F\uFF0C\u5728\u91CC\u9762"\u8BBE\u7F6E >> \u53D8\u91CF >> \u73AF\u5883\u53D8\u91CF"\uFF0C\u5C06\u73AF\u5883\u53D8\u91CF SHOW_VLESS \u8BBE\u7F6E\u4E3A on \uFF0C
-  \u4FDD\u5B58\u540E\uFF0C\u63A5\u7740\u5237\u65B0\u73B0\u5728\u8FD9\u4E2A\u7F51\u9875\uFF0C\u5C31\u80FD\u663E\u793Avless\u7684\u5206\u4EAB\u94FE\u63A5\u548Cclash-meta\u914D\u7F6E\u4FE1\u606F\u3002
-
-2\u3001\u5982\u679C\u4F7F\u7528Pages\u90E8\u7F72\u7684\uFF1A
-  \u524D\u5F80\u60A8\u521B\u5EFA\u7684 Pages \u5E94\u7528\u7A0B\u5E8F\uFF0C\u5728\u91CC\u9762"\u8BBE\u7F6E >> \u73AF\u5883\u53D8\u91CF >> \u5236\u4F5C(\u751F\u4EA7\u73AF\u5883)"\uFF0C\u5C06\u53D8\u91CF SHOW_VLESS \u8BBE\u7F6E\u4E3A on\uFF0C
-  \u7136\u540E\u524D\u5F80"\u90E8\u7F72 >> \u6240\u6709\u90E8\u7F72 >> \u627E\u5230\u72B6\u6001\u680F\u4E2D\u65F6\u95F4\u6700\u8FD1\u54EA\u4E2A >> \u70B9\u53F3\u8FB9\u4E09\u4E2A\u70B9\u7684\u56FE\u6807 >> \u91CD\u8BD5\u90E8\u7F72"\uFF08\u5982\u679C\u662F\u672C\u5730\u4E0A\u4F20\u7684\uFF0C\u5C31"\u521B\u5EFA\u65B0\u90E8\u7F72"\uFF09\uFF0C
-  \u518D\u6B21\u90E8\u7F72\uFF0C\u4FEE\u6539\u7684 SHOW_VLESS \u503C\u624D\u751F\u6548\uFF0C\u63A5\u7740\u5237\u65B0\u73B0\u5728\u8FD9\u4E2A\u7F51\u9875\uFF0C\u5C31\u80FD\u663E\u793Avless\u7684\u5206\u4EAB\u94FE\u63A5\u548Cclash-meta\u914D\u7F6E\u4FE1\u606F\u3002
-`;
-              return new Response(uuid_page_messges, {
-                status: 200,
-                headers: {
-                  "Content-Type": "text/plain;charset=utf-8"
-                }
-              });
+              return new Response("Not found", { status: 404 });
             }
           }
+          case `/sub`:
+            const url2 = new URL(request.url);
+            let password = url2.searchParams.get("pwd") || "";
+            let target = url2.searchParams.get("target");
+            let hostName = url2.searchParams.get("hostName") || url2.hostname;
+            userID = url2.searchParams.get("id") || userID;
+            let portParam = url2.searchParams.get("port");
+            let pathParam = url2.searchParams.get("path");
+            let cidrParam = url2.searchParams.get("cidr");
+            if (password) {
+              password = encodeURIComponent(password);
+              subPassword = encodeURIComponent(subPassword);
+            }
+            if (!isValidUUID(userID)) {
+              throw new Error("uuid is not valid");
+            }
+            let port = portParam || 443;
+            let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
+            let ipsArray = [];
+            if (!cidrParam && password === subPassword && ipaddrURL) {
+              let ips_html_docment = await fetchWebPageContent(ipaddrURL);
+              let ips_Array = ips_html_docment.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
+              ipsArray = sortIpAddresses(ips_Array);
+            } else if (cidrParam && password === subPassword) {
+              let ips_Array = getCidrParamAndGenerateIps(cidrParam);
+              ipsArray = sortIpAddresses(ips_Array);
+            } else {
+              return new Response("Not found", { status: 404 });
+            }
+            if (target === "vless") {
+              let page = url2.searchParams.get("page") || 1;
+              let maxNodeNumber = url2.searchParams.get("maxNode") || 1e3;
+              maxNodeNumber = maxNodeNumber > 0 && maxNodeNumber <= 5e3 ? maxNodeNumber : 1e3;
+              let chunkedArray = splitArrayEvenly(ipsArray, maxNodeNumber);
+              let totalPage = Math.ceil(ipsArray.length / maxNodeNumber);
+              if (page > totalPage || page < 1) {
+                return new Response("Not found", { status: 404 });
+              }
+              let ipsArrayChunked = chunkedArray[page - 1];
+              let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, port, path, userID);
+              let vlessArrayStr = reusltArray.join("\n");
+              return new Response(vlessArrayStr, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+            } else if (target === "clash") {
+              let page = url2.searchParams.get("page") || 1;
+              let maxNode = url2.searchParams.get("maxNode") || 300;
+              maxNode = maxNode > 0 && maxNode <= 1e3 ? maxNode : 300;
+              let chunkedArray = splitArrayEvenly(ipsArray, maxNode);
+              let totalPage = Math.ceil(ipsArray.length / maxNode);
+              if (page > totalPage || page < 1) {
+                return new Response("Not found", { status: 404 });
+              }
+              let clash_html_docment = await fetchWebPageContent(clash_template);
+              let ipsArrayChunked = chunkedArray[page - 1];
+              let proxyies = [];
+              let nodeNameArray = [];
+              for (let i = 0; i < ipsArrayChunked.length; i++) {
+                let ipaddr = ipsArrayChunked[i];
+                let nodeName = `${ipaddr}:${port}`;
+                let tls = hostName.includes("workers.dev") ? false : true;
+                let sni = tls ? hostName : "";
+                let clashConfig2 = `  - {"type":"vless","name":"${nodeName}","server":"${ipaddr}","port":${port},"uuid":"${userID}","network":"ws","tls":${tls},"udp":false,"sni":"${sni}","client-fingerprint":"chrome","ws-opts":{"path":"${path}","headers":{"host":"${hostName}"}}}`;
+                proxyies.push(clashConfig2);
+                nodeNameArray.push(nodeName);
+              }
+              let replaceProxyies = clash_html_docment.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join("\n"));
+              let clashConfig = replaceProxyies.replace(/      - 001/g, nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
+              return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+            }
           default:
             return new Response("Not found", { status: 404 });
         }
@@ -597,6 +660,107 @@ clash-meta
 ---------------------------------------------------------------
 ################################################################
 `;
+}
+function generateAllIpsFromCidr(cidr) {
+  const cidrMatch = cidr.match(/^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/);
+  if (!cidrMatch)
+    return [];
+  const baseIp = cidrMatch[1];
+  const subnetMask = Number(cidrMatch[2]);
+  const ipArray = baseIp.split(".").map(Number);
+  const maskBits = 32 - subnetMask;
+  const maxSubnetSize = Math.pow(2, maskBits) - 2;
+  const baseIpNum = ipArray.reduce((sum, num, idx) => sum + (num << (3 - idx) * 8), 0);
+  const ips = [];
+  for (let i = 1; i <= maxSubnetSize; i++) {
+    const ipNum = baseIpNum + i;
+    const ip = [ipNum >>> 24 & 255, ipNum >>> 16 & 255, ipNum >>> 8 & 255, ipNum & 255].join(".");
+    ips.push(ip);
+  }
+  return ips;
+}
+function randomIpsFromCidrList(cidrList, count) {
+  const allIps = cidrList.map(generateAllIpsFromCidr).flat();
+  const uniqueIps = /* @__PURE__ */ new Set();
+  while (uniqueIps.size < count && uniqueIps.size < allIps.length) {
+    const randomIndex = Math.floor(Math.random() * allIps.length);
+    uniqueIps.add(allIps[randomIndex]);
+  }
+  return [...uniqueIps];
+}
+function ipToNumber(ip) {
+  return ip.split(".").reduce((acc, octet) => acc * 256 + parseInt(octet, 10), 0);
+}
+function sortIpAddresses(ipAddresses) {
+  return ipAddresses.sort((a, b) => {
+    if (isValidIpAddress(a) && isValidIpAddress(b)) {
+      return ipToNumber(a) - ipToNumber(b);
+    } else if (!isValidIpAddress(a) && !isValidIpAddress(b)) {
+      return a.localeCompare(b);
+    } else {
+      return isValidIpAddress(a) ? 1 : -1;
+    }
+  });
+}
+function isValidIpAddress(ip) {
+  const parts = ip.split(".");
+  return parts.length === 4 && parts.every((part) => /^\d+$/.test(part) && parseInt(part, 10) >= 0 && parseInt(part, 10) <= 255);
+}
+async function fetchWebPageContent(URL2) {
+  try {
+    const response = await fetch(URL2);
+    if (!response.ok) {
+      throw new Error(`Failed to get: ${response.status}`);
+      return "";
+    } else {
+      return await response.text();
+    }
+  } catch (err) {
+    console.error(`Failed to fetch ${URL2} web conten: ${err.message}`);
+    return "";
+  }
+}
+function getCidrParamAndGenerateIps(cidrParam) {
+  let cidrs = [];
+  let vlessArray = [];
+  if (cidrParam.includes(",")) {
+    cidrs = cidrParam.split(",");
+  } else {
+    cidrs = [cidrParam];
+  }
+  const randomIps = randomIpsFromCidrList(cidrs, 1e3);
+  return randomIps;
+}
+function eachIpsArrayAndGenerateVless(ipsArray, hostName, port, path, userID2) {
+  let vlessArray = [];
+  for (let i = 0; i < ipsArray.length; i++) {
+    const ipaddr = ipsArray[i].trim();
+    let vlessMain;
+    if (ipaddr && hostName.includes("workers.dev")) {
+      vlessMain = `vless://${userID2}@${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
+    } else if (ipaddr) {
+      vlessMain = `vless://${userID2}@${ipaddr}:${port}?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
+    }
+    if (vlessMain) {
+      vlessArray.push(vlessMain);
+    }
+  }
+  return vlessArray;
+}
+function splitArray(array, chunkSize) {
+  const chunks = [];
+  let index = 0;
+  while (index < array.length) {
+    chunks.push(array.slice(index, index + chunkSize));
+    index += chunkSize;
+  }
+  return chunks;
+}
+function splitArrayEvenly(array, maxChunkSize) {
+  const totalLength = array.length;
+  const numChunks = Math.ceil(totalLength / maxChunkSize);
+  const chunkSize = Math.ceil(totalLength / numChunks);
+  return splitArray(array, chunkSize);
 }
 export {
   worker_default as default

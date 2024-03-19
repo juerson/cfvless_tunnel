@@ -1,0 +1,16 @@
+name = "v2"
+main = "src/worker.js"
+compatibility_date = "2023-07-25"
+workers_dev = true
+
+[[routes]]
+# pattern = "**.***.link" # 打开当前js脚本网页的域名
+# zone_name = "***.link"  # 已经托管到Cloudflare的个人域名
+# custom_domain = true
+
+[vars]
+UUID = "0648919d-8bf1-4d4c-8525-36cf487506ec"
+SOCKS5 = ""  # Example: user:pass@host:port，它优先于PROXYIP
+PROXYIP = "cdn-b100.xn--b6gac.eu.org"
+CONFIG_PASSWORD = "" # 查看vless链接和clash-meta配置模板的密码，留空则不设置密码
+SUBSCRIPTIONS_PASSWORD = "" # 查看vless/clsh订阅的密码，留空则不设置密码
