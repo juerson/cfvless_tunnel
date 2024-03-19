@@ -43,7 +43,7 @@ https://a.abc.workers.dev/config?pwd=123456  # 123456是CF后台，环境变量C
 | port     | (可选) 修改vless的port值                                     |
 | hostName | (可选) 修改vless的sni和host的值，几乎不用                    |
 | path     | (可选) 修改vless的path值，几乎不用                           |
-| maxNode  | (可选) 修改每页最多写多少个节点，脚本会计算每页的节点数(平均数)，vless链接默认为1000，可选1~5000，clash默认为300，可选1~1000 |
+| maxNode  | (可选) 修改每页最多写多少个节点，脚本会计算每页的节点数(平均数)，vless链接默认为1000，可选1-5000，clash默认为300，可选1-1000 |
 | cidr     | (可选) 不使用脚本内，从ipaddrURL网页中，抓取的IP地址写入节点；使用这里的cidr生成的IP地址(随机1000个)写入节点。支持多个cidr（比如：cidr=104.30.1.0/24,108.162.255.0/24），只支持IPv4的CIDR。cidr随机生成的IP，最多1000个，不存在生成重复IP的情况。 |
 
 #### 1、vless订阅，使用例子：
