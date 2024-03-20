@@ -16,15 +16,15 @@ let socks5Address = ""; // 备用socks5代理地址，socks5Address优先于prox
 
 let ipaddrURL = "https://ipupdate.baipiao.eu.org/"; // 网友收集的CDN地址
 
-// 节点转换网址(别人的订阅地址，随时会失效或被别人的网站如入黑名单)，大概流程是传入一个虚假的节点链接过去，返回clash配置模板，比如：ss://MjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg=@127.0.0.1:443#001
+// 节点转换网址(别人的订阅转换地址，随时会失效或被别人的网站如入黑名单)，大概流程是传入一个虚假的节点链接过去，返回clash配置模板，比如：ss://MjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg=@127.0.0.1:443#001
 // let nodeConverterURL = "https://api.subcloud.xyz/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online.ini&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true";
 // let nodeConverterURL = "https://subapi.imgki.com/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false";
 
 /**
  * 使用clash模板，或使用nodeConverterURL的节点转换网址生成clash配置模板(使用太多，特别是同一个节点重复转换，可能会被封您的IP地址)
- * clash_template使用自己的GitHub账号在https://gist.github.com中创建一个文件，把clash模板写入，注意每次修改内容，链接都会变的，要更新到最新的，就要手动更新链接。
+ * clash_template使用自己的GitHub账号在https://gist.github.com中创建一个文件，把clash模板写入，注意，每次修改内容，链接都会变的，要更新到最新的，就要手动更新链接。
  */
-let clash_template = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/4004dddd322e8f8696e92edf47ab520242393e30/clash_template";
+let clash_template = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
 
 // 查看配置信息和订阅文件的密码
 let configPassword = ""; // 备用密码(优先使用环境变量)，查询vless配置信息的密码，http://your_worker_domain/config?pwd={CONFIG_PASSWORD}
