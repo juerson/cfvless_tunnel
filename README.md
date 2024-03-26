@@ -26,7 +26,7 @@
 
 4、不设置环境变量，代码中也没有修改，会暴露您的vless信息，不推荐。
 
-### 二、设置KV命名空间，并绑定KV命名空间（可以忽略，推荐使用）
+### 二、创建KV命名空间，并绑定KV命名空间（可以忽略，推荐使用）
 
 <img src="images\KV密钥_config_template_and_ipaddr.png" />
 
