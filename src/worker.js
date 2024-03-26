@@ -16,15 +16,25 @@ let socks5Address = ""; // 备用socks5代理地址，socks5Address优先于prox
 
 let ipaddrURL = "https://ipupdate.baipiao.eu.org/"; // 网友收集的CDN地址
 
-// 节点转换网址(别人的订阅转换地址，随时会失效或被别人的网站如入黑名单)，大概流程是传入一个虚假的节点链接过去，返回clash配置模板，比如：ss://MjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg=@127.0.0.1:443#001
+
+/**
+ * 三种方法，获取clash配置模板：
+ * 1、使用网友搭建的节点转换网址，传入一个虚假节点(ss://MjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg=@127.0.0.1:443#001),生成clash配置文件，把它爬取下来
+ * 2、使用GitHub中的gist(https://gist.github.com，注意：修改后，要更新url链接),把模板存到这里，worker脚本抓取这个链接，把配置文本爬取下来
+ * 3、使用cloudflare workers KV存储，把模板存到KV里面，worker脚本从KV里面读取模板文本
+ * 推荐使用第3种方法，因为它可以随时更新模板，而且不需要更新worker脚本。本worker脚本优选使用它（后面的代码中kv_ipaddr和kv_clash_template都是使用KV中的密钥值）。
+ */
+
+/*
+	节点转换网址：(别人的订阅转换地址，随时会失效，重复的节点转换会被节点转换网站检查到，随时会如入黑名单，无法长时间使用)
+							大概流程是传入一个虚假的节点链接过去，返回clash配置模板，
+							比如：ss://MjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg=@127.0.0.1:443#001
+*/
 // let nodeConverterURL = "https://api.subcloud.xyz/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online.ini&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true";
 // let nodeConverterURL = "https://subapi.imgki.com/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false";
 
-/**
- * 使用clash模板，或使用nodeConverterURL的节点转换网址生成clash配置模板
- * clash_template使用自己的GitHub账号在https://gist.github.com中创建一个文件，把clash模板写入，注意，每次修改内容，链接都会变的，要更新到最新的，就要手动更新链接。
- */
-let clash_template = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
+// GIST线上存储clash配置文件模板，需要就爬取下来，缺点：更新内容，这里的链接也要更新（无法自动更新）
+let clash_template_url = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
 
 // 查看配置信息和订阅文件的密码
 let configPassword = ""; // 备用密码(优先使用环境变量)，查询vless配置信息的密码，http://your_worker_domain/config?pwd={CONFIG_PASSWORD}
@@ -61,6 +71,11 @@ export default {
 			// 订阅地址的密码。前端使用访问：https://{your_worker_domain}/sub?pwd={SUBSCRIPTIONS_PASSWORD}&target={vless or clash}
 			// 可选参数（一个或多个），顺序不固定：&page=1&id={your_vless_uuid}&port={port}&cidr={cidr}&path={your_vless_path}&hostName={your_worker_domain}
 			subPassword = env.SUBSCRIPTIONS_PASSWORD || subPassword;
+
+			/* 读取/获取KV命令空间里面的密钥值（IP地址和clash配置模板） */
+			let kv_ipaddr = await env.CLASH_WITH_ADDRESS.get("ipaddr"); // ipaddr来源于KV命名空间里面的密钥
+			let kv_clash_template = await env.CLASH_WITH_ADDRESS.get("config_template"); // 同理，config_template来源于KV命名空间里面的密钥
+
 			// 检查字符串中是否有逗号
 			if (proxyIP.includes(',')) {
 				// 如果有逗号，将字符串分割成数组
@@ -131,22 +146,33 @@ export default {
 							password = encodeURIComponent(password); 			 // 将get请求接收的pwd参数(密码)进行编码
 							subPassword = encodeURIComponent(subPassword); // 将订阅密码编码
 						}
+
 						// 检查传入的id参数是否为合法的uuid
 						if (!isValidUUID(userID)) {
 							throw new Error('uuid is not valid');
 						}
+
 						let port = portParam || 443;
 						let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048"; // 对path进行url编码，没有path参数则使用默认值
 						let ipsArray = []; // 后面vless、clash中要使用到
 						/**
 						 * 这个if...else if...判断条件，为了获取IP地址，添加到ipsArray，有2种情况：
 						 * 		1. 传入了cidr参数，则从cidr参数中的cidr中生成IP地址
-						 * 		2. 使用内置ipaddrURL地址，抓取网页中的纯IPv4地址
+						 * 		2. 使用内置ipaddrURL地址，抓取网页中的纯IPv4地址，或KV中ipaddr密钥值中的IP地址
 						 * 顺便对IP地址排序，翻页时，保证IP地址的顺序（CIDR，随机生成的，顺序会被打乱）
 						 */
-						if (!cidrParam && password === subPassword && ipaddrURL) { 		 // 使用ipaddrURL中抓取到的IP地址生成vless链接
-							let ips_html_docment = await fetchWebPageContent(ipaddrURL); // 抓取网页的内容
-							let ips_Array = ips_html_docment.trim().split(/\r\n|\n|\r/).map(ip => ip.trim()); // 分割出ip地址到数组中
+						if (!cidrParam && password === subPassword) {
+							/**
+							 * Cloudflare workers KV中的ipaddr密钥值存在，就使用它，否则使用ipaddrURL网页的IP地址
+							 */
+							let ips_string = "";
+							if (kv_ipaddr) {
+								ips_string = kv_ipaddr;
+							} else {
+								ips_string = await fetchWebPageContent(ipaddrURL); // 抓取网页的内容
+							}
+							let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map(ip => ip.trim()); // 分割出ip地址到数组中
+							console.log(ips_Array);
 							// Array.prototype.push.apply(vlessArray, ips_Array); 		   // 将ips_Array中的所有元素添加到vlessArray中
 							ipsArray = sortIpAddresses(ips_Array); 								 			 // 按照IP地址排序（可以排序非IP地址），便于后面分页显示
 						} else if (cidrParam && password === subPassword) { 		 			 // 使用地址传入的cidr参数生成vless链接
@@ -164,7 +190,7 @@ export default {
 							 * 
 							 * 注意：
 							 * 		1、翻页CIDR，可能会导致节点重复，因为每次翻页都会生成新的IP地址；CIDR范围内的IP数小于maxNodeNumber数，会导致不满maxNodeNumber，节点不会重复
-							 * 		2、翻页ipaddrURL抓取的内容，在远程服务器没有更新内容情况下，生成的节点不会重复
+							 * 		2、翻页ipaddrURL抓取的内容或KV中ipaddr地址，在远程服务器没有更新内容情况下，生成的节点不会重复
 							 */
 							let page = url.searchParams.get("page") || 1; 							 // 从1开始的页码
 							let maxNodeNumber = url.searchParams.get('maxNode') || 1000; // 获取get请求链接中的maxNode参数(最大节点数)
@@ -190,7 +216,7 @@ export default {
 							 * 
 							 * 注意：
 							 * 		1、翻页CIDR，可能会导致节点重复，因为每次翻页都会生成新的IP地址；CIDR范围内的IP数小于maxNodeNumber数，会导致不满maxNodeNumber，节点不会重复
-							 * 		2、翻页ipaddrURL抓取的内容，在远程服务器没有更新内容情况下，生成的节点不会重复
+							 * 		2、翻页ipaddrURL抓取的内容或KV中ipaddr地址，在远程服务器没有更新内容情况下，生成的节点不会重复
 							 */
 							let page = url.searchParams.get("page") || 1; 						  // 从1开始的页码
 							let maxNode = url.searchParams.get('maxNode') || 300; 			// 获取get请求链接中的maxNode参数(最大节点数)
@@ -202,7 +228,15 @@ export default {
 							if (page > totalPage || page < 1) {
 								return new Response('Not found', { status: 404 });
 							}
-							let clash_html_docment = await fetchWebPageContent(clash_template); // 这里抓取网页的clash配置内容(clash配置模板)
+							/**
+							 * Cloudflare workers KV中的clash_template密钥值存在就使用它，否则使用clash_template_url提供的clash配置文件模板
+							 */
+							let clash_template = "";
+							if (kv_clash_template) {
+								clash_template = kv_clash_template; // 这里使用KV内的clash配置模板
+							} else {
+								clash_template = await fetchWebPageContent(clash_template_url); // 这里抓取网页的clash配置内容(clash配置模板)
+							}
 							let ipsArrayChunked = chunkedArray[page - 1]; // 使用哪个子数组的数据？ “page - 1”：保证索引是从0开始的，前面设置页码从1开始了
 							let proxyies = [];
 							let nodeNameArray = [];
@@ -216,7 +250,7 @@ export default {
 								nodeNameArray.push(nodeName); 		  // 节点名称，在clash分组中使用
 							}
 							// 替换clash配置中proxies字段的节点(ss节点数据)，要替换的内容一定要一模一样
-							let replaceProxyies = clash_html_docment.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join('\n'));
+							let replaceProxyies = clash_template.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join('\n'));
 							// 替换proxy-groups中的proxies节点名称，生成最终的clash的配置文件信息
 							let clashConfig = replaceProxyies.replace(/      - 001/g, nodeNameArray.map(ipWithPort => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, ""); // 如果一些节点转换为clash存在“dns-failed,”字符串，就要删除掉，否则导入clash程序使用会报错
 							return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -568,7 +602,6 @@ function processVlessHeader(
 		isUDP,
 	};
 }
-
 
 /**
  * @param {import("@cloudflare/workers-types").Socket} remoteSocket 
