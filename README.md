@@ -14,6 +14,8 @@
 
 使用Pages部署的，在`设置 >> 环境变量 >> 制作 >> 添加变量`中，添加前面的5个变量。
 
+<img src="images\环境变量.png" />
+
 注意：
 
 1、Workers部署：添加、修改`环境变量`，立刻生效，如果没有生效，可能有延迟或浏览器缓存问题。
@@ -24,7 +26,17 @@
 
 4、不设置环境变量，代码中也没有修改，会暴露您的vless信息，不推荐。
 
-### 二、查看配置：
+### 二、设置KV命名空间，并绑定KV命名空间（可以忽略，推荐使用）
+
+<img src="images\KV密钥_config_template_and_ipaddr.png" />
+
+config_template的值，可以将文件`clash_template.yaml`的内容存进去。
+
+ipaddr的值，由你提供优先IP（可选项），每行一个IP。
+
+注意：图中的ConfigAndIpaddr命名空间名称，可以取其它名字，不需要按照图中的设置一模一样。
+
+### 三、查看配置：
 
 - 使用例子
 
@@ -32,7 +44,7 @@
 https://a.abc.workers.dev/config?pwd=123456  # 123456是CF后台，环境变量CONFIG_PASSWORD设置的值
 ```
 
-### 三、查看订阅：
+### 四、查看订阅：
 
 | 参数     | 含义                                                         |
 | -------- | ------------------------------------------------------------ |
@@ -78,6 +90,6 @@ https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.
 
 参数随意组合，只要参数是前面列表中的，都可以全部使用。
 
-### 三、友情提示
+### 五、友情提示
 
 路径`src/worker.js`中的代码为开发中写的代码，大部代码根据[@zizifn](https://github.com/zizifn/edgetunnel/blob/main/src/worker-with-socks5-experimental.js)修改而来，如果不是开发者，使用`_wokers.js`的代码部署到cloudflare wokers或pages就可以。

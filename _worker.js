@@ -5,7 +5,7 @@ var proxyList = ["cdn-all.xn--b6gac.eu.org", "cdn.xn--b6gac.eu.org", "cdn-b100.x
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
 var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
-var clash_template = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
+var clash_template_url = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
 var configPassword = "";
 var subPassword = "";
 var domainList = [
@@ -33,6 +33,8 @@ var worker_default = {
       socks5Address = env.SOCKS5 || socks5Address;
       configPassword = env.CONFIG_PASSWORD || configPassword;
       subPassword = env.SUBSCRIPTIONS_PASSWORD || subPassword;
+      let kv_ipaddr = await env.CLASH_WITH_ADDRESS.get("ipaddr");
+      let kv_clash_template = await env.CLASH_WITH_ADDRESS.get("config_template");
       if (proxyIP.includes(",")) {
         const arr = proxyIP.split(",");
         const randomIndex = Math.floor(Math.random() * arr.length);
@@ -101,9 +103,15 @@ var worker_default = {
             let port = portParam || 443;
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = [];
-            if (!cidrParam && password === subPassword && ipaddrURL) {
-              let ips_html_docment = await fetchWebPageContent(ipaddrURL);
-              let ips_Array = ips_html_docment.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
+            if (!cidrParam && password === subPassword) {
+              let ips_string = "";
+              if (kv_ipaddr) {
+                ips_string = kv_ipaddr;
+              } else {
+                ips_string = await fetchWebPageContent(ipaddrURL);
+              }
+              let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
+              console.log(ips_Array);
               ipsArray = sortIpAddresses(ips_Array);
             } else if (cidrParam && password === subPassword) {
               let ips_Array = getCidrParamAndGenerateIps(cidrParam);
@@ -133,7 +141,12 @@ var worker_default = {
               if (page > totalPage || page < 1) {
                 return new Response("Not found", { status: 404 });
               }
-              let clash_html_docment = await fetchWebPageContent(clash_template);
+              let clash_template = "";
+              if (kv_clash_template) {
+                clash_template = kv_clash_template;
+              } else {
+                clash_template = await fetchWebPageContent(clash_template_url);
+              }
               let ipsArrayChunked = chunkedArray[page - 1];
               let proxyies = [];
               let nodeNameArray = [];
@@ -146,7 +159,7 @@ var worker_default = {
                 proxyies.push(clashConfig2);
                 nodeNameArray.push(nodeName);
               }
-              let replaceProxyies = clash_html_docment.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join("\n"));
+              let replaceProxyies = clash_template.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join("\n"));
               let clashConfig = replaceProxyies.replace(/      - 001/g, nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
               return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             }

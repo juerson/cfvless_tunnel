@@ -3,11 +3,18 @@ main = "src/worker.js"
 compatibility_date = "2023-07-25"
 workers_dev = true
 
+# 触发器里面的自定义域
 [[routes]]
 # pattern = "**.***.link" # 打开当前js脚本网页的域名
 # zone_name = "***.link"  # 已经托管到Cloudflare的个人域名
 # custom_domain = true
 
+# KV命名空间
+# [[kv_namespaces]]
+# id = "......."  # 这个值，每人创建的KV命名空间的ID不同的
+# binding = "CLASH_WITH_ADDRESS" # 不可变，如果修改，也要修改worker.js的代码（设置->变量->KV 命名空间绑定->变量名称）
+
+# 环境变量
 [vars]
 UUID = "0648919d-8bf1-4d4c-8525-36cf487506ec"
 SOCKS5 = ""  # Example: user:pass@host:port，它优先于PROXYIP
