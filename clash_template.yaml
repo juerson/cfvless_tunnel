@@ -4,67 +4,40 @@ allow-lan: true
 mode: Rule
 log-level: info
 external-controller: :9090
+global-client-fingerprint: chrome
 dns:
   enable: true
   listen: :53
-  prefer-h3: true
-  ipv6: true
+  default-nameserver: [223.5.5.5, 119.29.29.29]
+  ipv6: false
   enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  fake-ip-filter:
-    - "*.lan"
-    - localhost.ptlogin2.qq.com
-    - +.srv.nintendo.net
-    - +.stun.playstation.net
-    - +.msftconnecttest.com
-    - +.msftncsi.com
-    - +.xboxlive.com
-    - msftconnecttest.com
-    - xbox.*.microsoft.com
-    - "*.battlenet.com.cn"
-    - "*.battlenet.com"
-    - "*.blzstatic.cn"
-    - "*.battle.net"
-  nameserver-policy:
-    '+.baidu.com': '180.76.76.76'
-    '+.toutiao.com': '180.184.1.1'
-    '+.cloudflare.com': https://cloudflare-dns.com/dns-query
-    '+.taobao.com': https://dns.alidns.com/dns-query
-    '+.bing.com': https://security.cloudflare-dns.com/dns-query
-    'geosite:geolocation-cn': ['https://dns.alidns.com/dns-query','https://doh.360.cn/dns-query','https://doh.pub/dns-query']
-    'geosite:geolocation-!cn': ['https://security.cloudflare-dns.com/dns-query','https://dns.google/dns-query']
-  proxy-server-nameserver: ['https://security.cloudflare-dns.com/dns-query','https://dns.google/dns-query']
-  default-nameserver: ["223.5.5.5","180.184.1.1"]
-  nameserver: ['https://dns.alidns.com/dns-query','https://doh.pub/dns-query']
-  fallback: ['tls://1.1.1.1:853','tls://8.8.8.8:853','tls://9.9.9.9:853']
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
-    geosite: ['gfw']
-    ipcidr: ['240.0.0.0/4','0.0.0.0/32']
-    domain: ["+.google.com","+.facebook.com","+.youtube.com"]
+  fake-ip-filter: ["*.n.n.srv.nintendo.net", +.stun.playstation.net, xbox.*.*.microsoft.com, "*.msftncsi.com", "*.msftconnecttest.com", WORKGROUP, "*.lan", stun.*.*.*, stun.*.*, time.windows.com, time.nist.gov, time.apple.com, time.asia.apple.com, "*.ntp.org.cn", "*.openwrt.pool.ntp.org", time1.cloud.tencent.com, time.ustc.edu.cn, pool.ntp.org, ntp.ubuntu.com, "*.*.xboxlive.com", speedtest.cros.wr.pvp.net]
+  nameserver: [tls://223.5.5.5:853, https://223.6.6.6/dns-query, https://120.53.53.53/dns-query]
+  nameserver-policy: {+.tmall.com: 223.5.5.5, +.taobao.com: 223.5.5.5, +.alicdn.com: 223.5.5.5, +.aliyun.com: 223.5.5.5, +.alipay.com: 223.5.5.5, +.alibaba.com: 223.5.5.5, +.qq.com: 119.29.29.29, +.tencent.com: 119.29.29.29, +.weixin.com: 119.29.29.29, +.qpic.cn: 119.29.29.29, +.jd.com: 119.29.29.29, +.bilibili.com: 119.29.29.29, +.hdslb.com: 119.29.29.29, +.163.com: 119.29.29.29, +.126.com: 119.29.29.29, +.126.net: 119.29.29.29, +.127.net: 119.29.29.29, +.netease.com: 119.29.29.29, +.baidu.com: 223.5.5.5, +.bdstatic.com: 223.5.5.5, +.bilivideo.+: 119.29.29.29, +.iqiyi.com: 119.29.29.29, +.douyinvod.com: 180.184.1.1, +.douyin.com: 180.184.1.1, +.douyincdn.com: 180.184.1.1, +.douyinpic.com: 180.184.1.1, +.feishu.cn: 180.184.1.1}
+  fallback: [tls://101.101.101.101:853,https://101.101.101.101/dns-query, https://public.dns.iij.jp/dns-query, https://208.67.220.220/dns-query]
+  fallback-filter: {geoip: true, ipcidr: [240.0.0.0/4, 0.0.0.0/32, 127.0.0.1/32], domain: [+.google.com, +.facebook.com, +.twitter.com, +.youtube.com, +.xn--ngstr-lra8j.com, +.google.cn, +.googleapis.cn, +.googleapis.com, +.gvt1.com, +.paoluz.com, +.paoluz.link, +.paoluz.xyz, +.sodacity-funk.xyz, +.nloli.xyz,+.jsdelivr.net, +.proton.me]}
 proxies:
-  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}
+  - {name: 01, server: 127.0.0.1, port: 80, type: ss, cipher: aes-128-gcm, password: a123456}
 proxy-groups:
   - name: 🔰 节点选择
     type: select
     proxies:
       - ♻️ 自动选择
       - 🎯 全球直连
-      - 001
+      - 01
   - name: ♻️ 自动选择
     type: url-test
     url: http://www.gstatic.com/generate_204
     interval: 300
     proxies:
-      - 001
+      - 01
   - name: 🎥 NETFLIX
     type: select
     proxies:
       - 🔰 节点选择
       - ♻️ 自动选择
       - 🎯 全球直连
-      - 001
+      - 01
   - name: ⛔️ 广告拦截
     type: select
     proxies:
@@ -83,7 +56,7 @@ proxy-groups:
       - 🔰 节点选择
       - ♻️ 自动选择
       - 🎯 全球直连
-      - 001
+      - 01
   - name: 🌏 国内媒体
     type: select
     proxies:
@@ -94,20 +67,20 @@ proxy-groups:
     proxies:
       - 🎯 全球直连
       - 🔰 节点选择
-      - 001
+      - 01
   - name: 📲 电报信息
     type: select
     proxies:
       - 🔰 节点选择
       - 🎯 全球直连
-      - 001
+      - 01
   - name: 🍎 苹果服务
     type: select
     proxies:
       - 🔰 节点选择
       - 🎯 全球直连
       - ♻️ 自动选择
-      - 001
+      - 01
   - name: 🎯 全球直连
     type: select
     proxies:
@@ -123,10 +96,9 @@ proxy-groups:
       - 🔰 节点选择
       - 🎯 全球直连
       - ♻️ 自动选择
-      - 001
+      - 01
 rules:
   - DOMAIN-SUFFIX,local,🎯 全球直连
-  - IP-CIDR,1.1.1.0/24,🎯 全球直连,no-resolve
   - IP-CIDR,192.168.0.0/16,🎯 全球直连,no-resolve
   - IP-CIDR,10.0.0.0/8,🎯 全球直连,no-resolve
   - IP-CIDR,172.16.0.0/12,🎯 全球直连,no-resolve
@@ -419,7 +391,6 @@ rules:
   - DOMAIN-SUFFIX,biz5.kankan.com,🛑 全球拦截
   - DOMAIN-SUFFIX,c.algovid.com,🛑 全球拦截
   - DOMAIN-SUFFIX,cms.laifeng.com,🛑 全球拦截
-  - DOMAIN-SUFFIX,da.mmarket.com,🛑 全球拦截
   - DOMAIN-SUFFIX,dotcounter.douyutv.com,🛑 全球拦截
   - DOMAIN-SUFFIX,g.uusee.com,🛑 全球拦截
   - DOMAIN-SUFFIX,gcdn.2mdn.net,🛑 全球拦截
@@ -9364,20 +9335,14 @@ rules:
   - DOMAIN-SUFFIX,hdslb.com,🌏 国内媒体
   - DOMAIN,upos-hz-mirrorakam.akamaized.net,🌏 国内媒体
   - DOMAIN,apiintl.biliapi.net,🌏 国内媒体
-  - DOMAIN,intel-cache.m.iqiyi.com,🌏 国内媒体
-  - DOMAIN,intel-cache.video.iqiyi.com,🌏 国内媒体
-  - DOMAIN,intl-rcd.iqiyi.com,🌏 国内媒体
-  - DOMAIN,intl-subscription.iqiyi.com,🌏 国内媒体
-  - DOMAIN-SUFFIX,inter.iqiyi.com,🌏 国内媒体
-  - DOMAIN-SUFFIX,inter.ptqy.gitv.tv,🌏 国内媒体
-  - DOMAIN-SUFFIX,intl.iqiyi.com,🌏 国内媒体
+  - DOMAIN-SUFFIX,iqiyi.com,🌏 国内媒体
+  - DOMAIN-SUFFIX,iqiyipic.com,🌏 国内媒体
   - DOMAIN-SUFFIX,iq.com,🌏 国内媒体
-  - IP-CIDR,103.44.56.0/22,🌏 国内媒体,no-resolve
-  - IP-CIDR,118.26.120.0/24,🌏 国内媒体,no-resolve
-  - IP-CIDR,118.26.32.0/23,🌏 国内媒体,no-resolve
-  - IP-CIDR,223.119.62.225/28,🌏 国内媒体,no-resolve
-  - IP-CIDR,23.40.241.251/32,🌏 国内媒体,no-resolve
-  - IP-CIDR,23.40.242.10/32,🌏 国内媒体,no-resolve
+  - DOMAIN-SUFFIX,qy.net,🌏 国内媒体
+  - DOMAIN-SUFFIX,gitv.tv,🌏 国内媒体
+  - DOMAIN-SUFFIX,71.am,🌏 国内媒体
+  - DOMAIN-KEYWORD,qiyi,🌏 国内媒体
+  - DOMAIN,cache.video.iqiyi.com,🌏 国内媒体
   - DOMAIN-SUFFIX,api.mob.app.letv.com,🌏 国内媒体
   - DOMAIN-SUFFIX,v.smtcdns.com,🌏 国内媒体
   - DOMAIN-SUFFIX,vv.video.qq.com,🌏 国内媒体
