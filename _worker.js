@@ -5,7 +5,7 @@ var proxyList = ["cdn-all.xn--b6gac.eu.org", "cdn.xn--b6gac.eu.org", "cdn-b100.x
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
 var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
-var clash_template_url = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
+var clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml";
 var configPassword = "";
 var subPassword = "";
 var domainList = [
@@ -159,8 +159,8 @@ var worker_default = {
                 proxyies.push(clashConfig2);
                 nodeNameArray.push(nodeName);
               }
-              let replaceProxyies = clash_template.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join("\n"));
-              let clashConfig = replaceProxyies.replace(/      - 001/g, nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
+              let replaceProxyies = clash_template.replace(/  - {name: 01, server: 127.0.0.1, port: 80, type: ss, cipher: aes-128-gcm, password: a123456}/g, proxyies.join("\n"));
+              let clashConfig = replaceProxyies.replace(/      - 01/g, nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
               return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             }
           default:

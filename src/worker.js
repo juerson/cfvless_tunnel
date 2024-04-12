@@ -33,8 +33,7 @@ let ipaddrURL = "https://ipupdate.baipiao.eu.org/"; // 网友收集的CDN地址
 // let nodeConverterURL = "https://api.subcloud.xyz/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false&config=https%3A%2F%2Fraw.githubusercontent.com%2FACL4SSR%2FACL4SSR%2Fmaster%2FClash%2Fconfig%2FACL4SSR_Online.ini&emoji=true&list=false&tfo=false&scv=true&fdn=false&sort=false&new_name=true";
 // let nodeConverterURL = "https://subapi.imgki.com/sub?target=clash&url=ss%3A%2F%2FMjAyMi1ibGFrZTMtY2hhY2hhMjAtcG9seTEzMDU6MTIzNDU2Nzg%3D%40127.0.0.1%3A443%23001&insert=false";
 
-// GIST线上存储clash配置文件模板，需要就爬取下来，缺点：更新内容，这里的链接也要更新（无法自动更新）
-let clash_template_url = "https://gist.githubusercontent.com/juerson/f7b0a8448458690dad63e58fef391652/raw/884c7cb799025e31af5f97e2ae5304374ba34542/clash_template";
+let clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml";
 
 // 查看配置信息和订阅文件的密码
 let configPassword = ""; // 备用密码(优先使用环境变量)，查询vless配置信息的密码，http://your_worker_domain/config?pwd={CONFIG_PASSWORD}
@@ -250,9 +249,9 @@ export default {
 								nodeNameArray.push(nodeName); 		  // 节点名称，在clash分组中使用
 							}
 							// 替换clash配置中proxies字段的节点(ss节点数据)，要替换的内容一定要一模一样
-							let replaceProxyies = clash_template.replace(/  - {name: 001, server: 127.0.0.1, port: 443, type: ss, cipher: 2022-blake3-chacha20-poly1305, password: !<str> 12345678, udp: true}/g, proxyies.join('\n'));
+							let replaceProxyies = clash_template.replace(/  - {name: 01, server: 127.0.0.1, port: 80, type: ss, cipher: aes-128-gcm, password: a123456}/g, proxyies.join('\n'));
 							// 替换proxy-groups中的proxies节点名称，生成最终的clash的配置文件信息
-							let clashConfig = replaceProxyies.replace(/      - 001/g, nodeNameArray.map(ipWithPort => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, ""); // 如果一些节点转换为clash存在“dns-failed,”字符串，就要删除掉，否则导入clash程序使用会报错
+							let clashConfig = replaceProxyies.replace(/      - 01/g, nodeNameArray.map(ipWithPort => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, ""); // 如果一些节点转换为clash存在“dns-failed,”字符串，就要删除掉，否则导入clash程序使用会报错
 							return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 						}
 					default:
