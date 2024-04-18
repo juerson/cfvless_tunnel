@@ -60,7 +60,7 @@ https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=500&cidr=104.30.1.0/24,108.162.255.0/24
 ```
 
-参数随意组合，只要参数是前面列表中的，都可以全部使用。
+参数随意组合，只要参数是前面表格中的，都可以全部使用。
 
 #### 2、Clash订阅，使用例子：
 
@@ -76,7 +76,7 @@ https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.30.1.0/24,108.162.255.0/24
 ```
 
-参数随意组合，只要参数是前面列格中的，都可以全部使用。
+参数随意组合，只要参数是前面表格中的，都可以全部使用。
 
 ### 四、温馨提示
 
