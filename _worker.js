@@ -20,21 +20,13 @@ var domainList = [
 var parsedSocks5Address = {};
 var enableSocks = false;
 var worker_default = {
-  /**
-   * @param {import("@cloudflare/workers-types").Request} request
-   * @param {{UUID: string, PROXYIP: string, SOCKS5: string, CONFIG_PASSWORD: string, SUBSCRIPTIONS_PASSWORD: string}} env
-   * @param {import("@cloudflare/workers-types").ExecutionContext} ctx
-   * @returns {Promise<Response>}
-   */
   async fetch(request, env, ctx) {
     try {
       userID = env.UUID || userID;
       proxyIP = env.PROXYIP || proxyIP;
       socks5Address = env.SOCKS5 || socks5Address;
       configPassword = env.CONFIG_PASSWORD || configPassword;
-      subPassword = env.SUBSCRIPTIONS_PASSWORD || subPassword;
-      let kv_ipaddr = await env.CLASH_WITH_ADDRESS.get("ipaddr");
-      let kv_clash_template = await env.CLASH_WITH_ADDRESS.get("config_template");
+      subPassword = env.SUB_PASSWORD || subPassword;
       if (proxyIP.includes(",")) {
         const arr = proxyIP.split(",");
         const randomIndex = Math.floor(Math.random() * arr.length);
@@ -47,8 +39,7 @@ var worker_default = {
           parsedSocks5Address = socks5AddressParser(socks5Address);
           enableSocks = true;
         } catch (err) {
-          let e = err;
-          console.log(e.toString());
+          console.log(err.toString());
           enableSocks = false;
         }
       }
@@ -104,14 +95,8 @@ var worker_default = {
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = [];
             if (!cidrParam && password === subPassword) {
-              let ips_string = "";
-              if (kv_ipaddr) {
-                ips_string = kv_ipaddr;
-              } else {
-                ips_string = await fetchWebPageContent(ipaddrURL);
-              }
+              let ips_string = await fetchWebPageContent(ipaddrURL);
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
-              console.log(ips_Array);
               ipsArray = sortIpAddresses(ips_Array);
             } else if (cidrParam && password === subPassword) {
               let ips_Array = getCidrParamAndGenerateIps(cidrParam);
@@ -131,7 +116,8 @@ var worker_default = {
               let ipsArrayChunked = chunkedArray[page - 1];
               let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, port, path, userID);
               let vlessArrayStr = reusltArray.join("\n");
-              return new Response(vlessArrayStr, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+              let encoded = btoa(vlessArrayStr);
+              return new Response(encoded, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             } else if (target === "clash") {
               let page = url2.searchParams.get("page") || 1;
               let maxNode = url2.searchParams.get("maxNode") || 300;
@@ -141,12 +127,7 @@ var worker_default = {
               if (page > totalPage || page < 1) {
                 return new Response("Not found", { status: 404 });
               }
-              let clash_template = "";
-              if (kv_clash_template) {
-                clash_template = kv_clash_template;
-              } else {
-                clash_template = await fetchWebPageContent(clash_template_url);
-              }
+              let clash_template = await fetchWebPageContent(clash_template_url);
               let ipsArrayChunked = chunkedArray[page - 1];
               let proxyies = [];
               let nodeNameArray = [];
@@ -170,8 +151,7 @@ var worker_default = {
         return await vlessOverWSHandler(request);
       }
     } catch (err) {
-      let e = err;
-      return new Response(e.toString());
+      return new Response(err.toString());
     }
   }
 };
@@ -212,7 +192,7 @@ async function vlessOverWSHandler(request) {
         isUDP
       } = processVlessHeader(chunk, userID);
       address = addressRemote;
-      portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? "udp " : "tcp "} `;
+      portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? "udp " : "tcp "}`;
       if (hasError) {
         throw new Error(message);
         return;
@@ -241,11 +221,7 @@ async function vlessOverWSHandler(request) {
   })).catch((err) => {
     log("readableWebSocketStream pipeTo error", err);
   });
-  return new Response(null, {
-    status: 101,
-    // @ts-ignore
-    webSocket: client
-  });
+  return new Response(null, { status: 101, webSocket: client });
 }
 async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log) {
   async function connectAndWrite(address, port, socks = false) {
@@ -297,13 +273,10 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
           controller.close();
         }
       );
-      webSocketServer.addEventListener(
-        "error",
-        (err) => {
-          log("webSocketServer has error");
-          controller.error(err);
-        }
-      );
+      webSocketServer.addEventListener("error", (err) => {
+        log("webSocketServer has error");
+        controller.error(err);
+      });
       const { earlyData, error } = base64ToArrayBuffer(earlyDataHeader);
       if (error) {
         controller.error(error);
@@ -326,10 +299,7 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
 }
 function processVlessHeader(vlessBuffer, userID2) {
   if (vlessBuffer.byteLength < 24) {
-    return {
-      hasError: true,
-      message: "invalid data"
-    };
+    return { hasError: true, message: "invalid data" };
   }
   const version = new Uint8Array(vlessBuffer.slice(0, 1));
   let isValidUser = false;
@@ -338,15 +308,10 @@ function processVlessHeader(vlessBuffer, userID2) {
     isValidUser = true;
   }
   if (!isValidUser) {
-    return {
-      hasError: true,
-      message: "invalid user"
-    };
+    return { hasError: true, message: "invalid user" };
   }
   const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
-  const command = new Uint8Array(
-    vlessBuffer.slice(18 + optLength, 18 + optLength + 1)
-  )[0];
+  const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
   if (command === 1) {
   } else if (command === 2) {
     isUDP = true;
@@ -360,9 +325,7 @@ function processVlessHeader(vlessBuffer, userID2) {
   const portBuffer = vlessBuffer.slice(portIndex, portIndex + 2);
   const portRemote = new DataView(portBuffer).getUint16(0);
   let addressIndex = portIndex + 2;
-  const addressBuffer = new Uint8Array(
-    vlessBuffer.slice(addressIndex, addressIndex + 1)
-  );
+  const addressBuffer = new Uint8Array(vlessBuffer.slice(addressIndex, addressIndex + 1));
   const addressType = addressBuffer[0];
   let addressLength = 0;
   let addressValueIndex = addressIndex + 1;
@@ -370,24 +333,16 @@ function processVlessHeader(vlessBuffer, userID2) {
   switch (addressType) {
     case 1:
       addressLength = 4;
-      addressValue = new Uint8Array(
-        vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
-      ).join(".");
+      addressValue = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join(".");
       break;
     case 2:
-      addressLength = new Uint8Array(
-        vlessBuffer.slice(addressValueIndex, addressValueIndex + 1)
-      )[0];
+      addressLength = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
       addressValueIndex += 1;
-      addressValue = new TextDecoder().decode(
-        vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
-      );
+      addressValue = new TextDecoder().decode(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
       break;
     case 3:
       addressLength = 16;
-      const dataView = new DataView(
-        vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
-      );
+      const dataView = new DataView(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
       const ipv6 = [];
       for (let i = 0; i < 8; i++) {
         ipv6.push(dataView.getUint16(i * 2).toString(16));
@@ -395,16 +350,10 @@ function processVlessHeader(vlessBuffer, userID2) {
       addressValue = ipv6.join(":");
       break;
     default:
-      return {
-        hasError: true,
-        message: `invild  addressType is ${addressType}`
-      };
+      return { hasError: true, message: `invild  addressType is ${addressType}` };
   }
   if (!addressValue) {
-    return {
-      hasError: true,
-      message: `addressValue is empty, addressType is ${addressType}`
-    };
+    return { hasError: true, message: `addressValue is empty, addressType is ${addressType}` };
   }
   return {
     hasError: false,
@@ -425,11 +374,6 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
     new WritableStream({
       start() {
       },
-      /**
-       * 
-       * @param {Uint8Array} chunk 
-       * @param {*} controller 
-       */
       async write(chunk, controller) {
         hasIncomingData = true;
         if (webSocket.readyState !== WS_READY_STATE_OPEN) {
@@ -452,10 +396,7 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
       }
     })
   ).catch((error) => {
-    console.error(
-      `remoteSocketToWS has exception `,
-      error.stack || error
-    );
+    console.error(`remoteSocketToWS has exception `, error.stack || error);
     safeCloseWebSocket(webSocket);
   });
   if (hasIncomingData === false && retry) {
@@ -510,10 +451,7 @@ async function handleDNSQuery(udpChunk, webSocket, vlessResponseHeader, log) {
     const dnsServer = "103.247.36.36";
     const dnsPort = 53;
     let vlessHeader = vlessResponseHeader;
-    const tcpSocket = connect({
-      hostname: dnsServer,
-      port: dnsPort
-    });
+    const tcpSocket = connect({ hostname: dnsServer, port: dnsPort });
     log(`connected to ${dnsServer}:${dnsPort}`);
     const writer = tcpSocket.writable.getWriter();
     await writer.write(udpChunk);
@@ -537,17 +475,12 @@ async function handleDNSQuery(udpChunk, webSocket, vlessResponseHeader, log) {
       }
     }));
   } catch (error) {
-    console.error(
-      `handleDNSQuery have exception, error: ${error.message}`
-    );
+    console.error(`handleDNSQuery have exception, error: ${error.message}`);
   }
 }
 async function socks5Connect(addressType, addressRemote, portRemote, log) {
   const { username, password, hostname, port } = parsedSocks5Address;
-  const socket = connect({
-    hostname,
-    port
-  });
+  const socket = connect({ hostname, port });
   const socksGreeting = new Uint8Array([5, 2, 0, 2]);
   const writer = socket.writable.getWriter();
   await writer.write(socksGreeting);
@@ -586,19 +519,13 @@ async function socks5Connect(addressType, addressRemote, portRemote, log) {
   let DSTADDR;
   switch (addressType) {
     case 1:
-      DSTADDR = new Uint8Array(
-        [1, ...addressRemote.split(".").map(Number)]
-      );
+      DSTADDR = new Uint8Array([1, ...addressRemote.split(".").map(Number)]);
       break;
     case 2:
-      DSTADDR = new Uint8Array(
-        [3, addressRemote.length, ...encoder.encode(addressRemote)]
-      );
+      DSTADDR = new Uint8Array([3, addressRemote.length, ...encoder.encode(addressRemote)]);
       break;
     case 3:
-      DSTADDR = new Uint8Array(
-        [4, ...addressRemote.split(":").flatMap((x) => [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2), 16)])]
-      );
+      DSTADDR = new Uint8Array([4, ...addressRemote.split(":").flatMap((x) => [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2), 16)])]);
       break;
     default:
       log(`invild  addressType is ${addressType}`);
@@ -638,12 +565,7 @@ function socks5AddressParser(address) {
   if (hostname.includes(":") && !regex.test(hostname)) {
     throw new Error("Invalid SOCKS address format");
   }
-  return {
-    username,
-    password,
-    hostname,
-    port
-  };
+  return { username, password, hostname, port };
 }
 function getVLESSConfig(userID2, hostName) {
   const vlessMain = `vless://${userID2}@${hostName}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
