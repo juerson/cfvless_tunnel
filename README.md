@@ -65,18 +65,18 @@ https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=500&cidr=10
 #### 2、Clash订阅，使用例子：
 
 ```
-https://a.abc.workers.dev/sub?pwd=123456&target=clash			          # 第一页的clash配置
+https://a.abc.workers.dev/sub?pwd=123456&target=clash			         # 第一页的clash配置
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2	          # 翻页，存在其它页，每页最多300节点
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&id={uuid}	          # 修改为其它uuid
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&port=2053           # 改为其它端口
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&hostName=githu.com  # 修改节点信息中的sni和host值
-https://a.abc.workers.dev/sub?pwd=123456&target=clash&path=/hello		  # 修改节点信息中的path
+https://a.abc.workers.dev/sub?pwd=123456&target=clash&path=/hello		 # 修改节点信息中的path
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&cidr=104.30.1.0/24
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.30.1.0/24,108.162.255.0/24
 ```
 
-参数随意组合，只要参数是前面列表中的，都可以全部使用。
+参数随意组合，只要参数是前面列格中的，都可以全部使用。
 
 ### 四、温馨提示
 
