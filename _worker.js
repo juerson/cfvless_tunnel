@@ -57,8 +57,7 @@ var worker_default = {
             });
             return redirectResponse;
           case `/config`: {
-            const url3 = new URL(request.url);
-            let password2 = url3.searchParams.get("pwd") || "";
+            let password2 = url.searchParams.get("pwd") || "";
             if (password2) {
               password2 = encodeURIComponent(password2);
               configPassword = encodeURIComponent(configPassword);
@@ -76,14 +75,13 @@ var worker_default = {
             }
           }
           case `/sub`:
-            const url2 = new URL(request.url);
-            let password = url2.searchParams.get("pwd") || "";
-            let target = url2.searchParams.get("target");
-            let hostName = url2.searchParams.get("hostName") || url2.hostname;
-            userID = url2.searchParams.get("id") || userID;
-            let portParam = url2.searchParams.get("port");
-            let pathParam = url2.searchParams.get("path");
-            let cidrParam = url2.searchParams.get("cidr");
+            let password = url.searchParams.get("pwd") || "";
+            let target = url.searchParams.get("target");
+            let hostName = url.searchParams.get("hostName") || url.hostname;
+            userID = url.searchParams.get("id") || userID;
+            let portParam = url.searchParams.get("port");
+            let pathParam = url.searchParams.get("path");
+            let cidrParam = url.searchParams.get("cidr");
             if (password) {
               password = encodeURIComponent(password);
               subPassword = encodeURIComponent(subPassword);
@@ -99,14 +97,13 @@ var worker_default = {
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
               ipsArray = sortIpAddresses(ips_Array);
             } else if (cidrParam && password === subPassword) {
-              let ips_Array = getCidrParamAndGenerateIps(cidrParam);
-              ipsArray = sortIpAddresses(ips_Array);
+              ipsArray = getCidrParamAndGenerateIps(cidrParam);
             } else {
               return new Response("Not found", { status: 404 });
             }
             if (target === "vless") {
-              let page = url2.searchParams.get("page") || 1;
-              let maxNodeNumber = url2.searchParams.get("maxNode") || 1e3;
+              let page = url.searchParams.get("page") || 1;
+              let maxNodeNumber = url.searchParams.get("maxNode") || 1e3;
               maxNodeNumber = maxNodeNumber > 0 && maxNodeNumber <= 5e3 ? maxNodeNumber : 1e3;
               let chunkedArray = splitArrayEvenly(ipsArray, maxNodeNumber);
               let totalPage = Math.ceil(ipsArray.length / maxNodeNumber);
@@ -119,8 +116,8 @@ var worker_default = {
               let encoded = btoa(vlessArrayStr);
               return new Response(encoded, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             } else if (target === "clash") {
-              let page = url2.searchParams.get("page") || 1;
-              let maxNode = url2.searchParams.get("maxNode") || 300;
+              let page = url.searchParams.get("page") || 1;
+              let maxNode = url.searchParams.get("maxNode") || 300;
               maxNode = maxNode > 0 && maxNode <= 1e3 ? maxNode : 300;
               let chunkedArray = splitArrayEvenly(ipsArray, maxNode);
               let totalPage = Math.ceil(ipsArray.length / maxNode);

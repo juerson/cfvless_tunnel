@@ -38,7 +38,7 @@ https://a.abc.workers.dev/config?pwd=123456  # 假如123456是CF后台中，环�
 | -------- | ------------------------------------------------------------ |
 | pwd      | (必须) 查看订阅的密码，密码是CF后台中环境变量SUB_PASSWORD设置的值 |
 | target   | (必须) target=vless：vless链接的订阅；target=clash：clash配置的订阅 |
-| page     | (可选) 页码，不设置默认为1，显示哪一页的vless或clash订阅内容？超出页码显示"Not found" |
+| page     | (可选) 页码，默认为1，显示哪一页的vless或clash订阅内容？超出页码显示"Not found"，对传入cidr参数的值无效(更新订阅就能更换节点)。 |
 | id       | (可选) 修改vless的uuid的值，仅用于修改订阅中UUID，不能使用新的UUID来连接这个脚本代理，几乎不用 |
 | port     | (可选) 修改vless的port值                                     |
 | hostName | (可选) 修改vless的sni和host的值，几乎不用                    |
@@ -49,12 +49,12 @@ https://a.abc.workers.dev/config?pwd=123456  # 假如123456是CF后台中，环�
 #### 1、vless订阅，使用例子：
 
 ```
-https://a.abc.workers.dev/sub?pwd=123456&target=vless			          # 第一页的vless节点
-https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2	          # 翻页，存在其它页，每页最多1000节点
-https://a.abc.workers.dev/sub?pwd=123456&target=vless&id={uuid}	          # 修改为其它uuid
+https://a.abc.workers.dev/sub?pwd=123456&target=vless                     # 第一页的vless节点
+https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2              # 翻页，存在其它页，每页最多1000节点
+https://a.abc.workers.dev/sub?pwd=123456&target=vless&id={uuid}           # 修改为其它uuid
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&port=2053           # 改为其它端口
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&hostName=githu.com  # 修改节点信息中的sni和host值
-https://a.abc.workers.dev/sub?pwd=123456&target=vless&path=/hello		  # 修改节点信息中的path
+https://a.abc.workers.dev/sub?pwd=123456&target=vless&path=/hello         # 修改节点信息中的path
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&cidr=104.30.1.0/24
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=500&cidr=104.30.1.0/24,108.162.255.0/24
@@ -65,12 +65,12 @@ https://a.abc.workers.dev/sub?pwd=123456&target=vless&page=2&maxNode=500&cidr=10
 #### 2、Clash订阅，使用例子：
 
 ```
-https://a.abc.workers.dev/sub?pwd=123456&target=clash			         # 第一页的clash配置
-https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2	          # 翻页，存在其它页，每页最多300节点
-https://a.abc.workers.dev/sub?pwd=123456&target=clash&id={uuid}	          # 修改为其它uuid
+https://a.abc.workers.dev/sub?pwd=123456&target=clash                     # 第一页的clash配置
+https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2              # 翻页，存在其它页，每页最多300节点
+https://a.abc.workers.dev/sub?pwd=123456&target=clash&id={uuid}           # 修改为其它uuid
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&port=2053           # 改为其它端口
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&hostName=githu.com  # 修改节点信息中的sni和host值
-https://a.abc.workers.dev/sub?pwd=123456&target=clash&path=/hello		 # 修改节点信息中的path
+https://a.abc.workers.dev/sub?pwd=123456&target=clash&path=/hello         # 修改节点信息中的path
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&cidr=104.30.1.0/24
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.30.1.0/24,108.162.255.0/24

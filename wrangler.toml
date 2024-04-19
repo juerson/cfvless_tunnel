@@ -1,6 +1,6 @@
 name = "worker-falling-grass-c407"
 main = "src/worker.js"
-compatibility_date = "2024-04-18"
+compatibility_date = "2023-12-18"
 workers_dev = true
 
 [vars]

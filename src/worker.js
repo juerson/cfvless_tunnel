@@ -20,7 +20,7 @@ let clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunn
  *        &page=1&id={your_vless_uuid}&port={port}&cidr={cidr}&path={your_vless_path}&hostName={your_worker_domain}
  */
 let configPassword = ""; // 备用
-let subPassword = ""; // 备用
+let subPassword = "";    // 备用
 
 const domainList = [
   'https://www.iq.com',
@@ -76,7 +76,6 @@ export default {
             });
             return redirectResponse;
           case `/config`: {
-            const url = new URL(request.url);
             // 接收地址中传入的pwd参数值
             let password = url.searchParams.get('pwd') || "";
             if (password) {
@@ -97,7 +96,6 @@ export default {
             }
           }
           case `/sub`:
-            const url = new URL(request.url);
             let password = url.searchParams.get('pwd') || "";	// (必须的)接收pwd参数(password密码的简写)，不传入pwd参数则不能查看对应的配置信息
             let target = url.searchParams.get('target');			// (必须的)接收target参数，指向什么订阅？vless or clash?
             let hostName = url.searchParams.get('hostName') || url.hostname;	// 接收hostName参数，没有则使用当前网页的域名，可选的（填充到vless中的sni和host）
@@ -114,19 +112,19 @@ export default {
               throw new Error('uuid is not valid');
             }
             let port = portParam || 443;
-            let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048"; // 对path进行url编码，没有path参数则使用默认值
+            // 对path进行url编码，没有path参数则使用默认值
+            let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = []; // 后面vless、clash中要使用到
 
             // 获取订阅需要的优选CDN IP，后面需要它构建节点信息
             if (!cidrParam && password === subPassword) {
               let ips_string = await fetchWebPageContent(ipaddrURL);
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map(ip => ip.trim());
-              ipsArray = sortIpAddresses(ips_Array); 								 			 // 按照IP排序，便于后面分页显示
+              ipsArray = sortIpAddresses(ips_Array); 								 	// 按照IP排序，便于后面分页显示
             } else if (cidrParam && password === subPassword) {
-              let ips_Array = getCidrParamAndGenerateIps(cidrParam); 			 // 截取get请求中的cidr参数并生成ip地址(最多1000个)
-              ipsArray = sortIpAddresses(ips_Array); 							   			 // 按照IP排序，便于后面分页显示
+              ipsArray = getCidrParamAndGenerateIps(cidrParam); 			// 使用get请求中的cidr参数值生成ip地址(最多1000个，顺序随机)
             } else {
-              return new Response('Not found', { status: 404 }); 		 			 // 密码错误，显示Not found
+              return new Response('Not found', { status: 404 }); 		 	// 密码错误，显示Not found
             }
             if (target === "vless") {
               /**
@@ -136,7 +134,7 @@ export default {
                * maxNode参数：每页最多的节点数
                * 
                */
-              let page = url.searchParams.get("page") || 1; 							 // 从1开始的页码
+              let page = url.searchParams.get("page") || 1;                // 从1开始的页码
               let maxNodeNumber = url.searchParams.get('maxNode') || 1000; // 获取get请求链接中的maxNode参数(最大节点数)
               maxNodeNumber = (maxNodeNumber > 0 && maxNodeNumber <= 5000) ? maxNodeNumber : 1000; // 限制最大节点数
               // splitArrayEvenly函数：ipArray数组分割成每个子数组都不超过maxNode的数组(子数组之间元素个数平均分配)
@@ -146,11 +144,13 @@ export default {
               if (page > totalPage || page < 1) {
                 return new Response('Not found', { status: 404 });
               }
-              let ipsArrayChunked = chunkedArray[page - 1]; // 使用哪个子数组的数据？
+              // 使用哪个子数组的数据？
+              let ipsArrayChunked = chunkedArray[page - 1];
               // 遍历ipsArray生成vless链接
               let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, port, path, userID);
               let vlessArrayStr = reusltArray.join('\n');
-              let encoded = btoa(vlessArrayStr); // base64编码
+              // base64编码
+              let encoded = btoa(vlessArrayStr);
               return new Response(encoded, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             } else if (target === "clash") {
               /**
