@@ -8,7 +8,16 @@ let proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)]; // 备用
 // 备用socks5代理地址，socks5Address优先于proxyIP（格式:  user:pass@host:port）
 let socks5Address = "";
 
-let ipaddrURL = "https://ipupdate.baipiao.eu.org/"; // 网友收集的CDN地址
+let ipaddrURL = "https://ipupdate.baipiao.eu.org/"; // 网友收集的优选IP(CDN)
+
+// —————————————————————————————————————————— 该参数用于访问GitHub的私有仓库文件 ——————————————————————————————————————————
+const DEFAULT_GITHUB_TOKEN = '';          // GitHub的令牌
+const DEFAULT_OWNER = '';                 // GitHub的用户名
+const DEFAULT_REPO = '';                  // GitHub的仓库名
+const DEFAULT_BRANCH = 'main';            // GitHub的分支名
+const DEFAULT_FILE_PATH = 'README.md';    // GitHub的文件路径
+// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+
 let clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml"; // clash模板
 
 /**
@@ -44,6 +53,14 @@ export default {
       socks5Address = env.SOCKS5 || socks5Address;
       configPassword = env.CONFIG_PASSWORD || configPassword;
       subPassword = env.SUB_PASSWORD || subPassword;
+
+      // ———————————————————————————— 访问GitHub的私有仓库文件 ————————————————————————————
+      const GITHUB_TOKEN = env.GITHUB_TOKEN || DEFAULT_GITHUB_TOKEN;
+      const OWNER = env.GITHUB_OWNER || DEFAULT_OWNER;
+      const REPO = env.GITHUB_REPO || DEFAULT_REPO;
+      const BRANCH = env.GITHUB_BRANCH || DEFAULT_BRANCH;
+      const FILE_PATH = env.GITHUB_FILE_PATH || DEFAULT_FILE_PATH;
+      // ————————————————————————————————————————————————————————————————————————————————
 
       // 检查字符串中是否含逗号，有的就随机从中选择一个元素
       if (proxyIP.includes(',')) {
@@ -103,6 +120,7 @@ export default {
             let portParam = url.searchParams.get('port');   	// 接收port参数，可选的
             let pathParam = url.searchParams.get('path');	    // 接收path参数，可选的
             let cidrParam = url.searchParams.get('cidr');	    // 就收cidr参数，可选的，如：cidr=104.21.192.0/19,104.21.64.0/19
+
             // 检查地址栏中传入的pwd密码，跟环境变量的SUB_PASSWORD密码是否一致，一才能能查看/执行订阅的代码
             if (password) {
               password = encodeURIComponent(password);
@@ -111,14 +129,26 @@ export default {
             if (!isValidUUID(userID)) {
               throw new Error('uuid is not valid');
             }
-            let port = portParam || 443;
+            // 根据hostName来判断使用什么端口（非TLS/TLS端口）
+            let defaultPort = hostName.endsWith('workers.dev') ? 8080 : 443;
+            let port = portParam || defaultPort;
             // 对path进行url编码，没有path参数则使用默认值
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = []; // 后面vless、clash中要使用到
 
             // 获取订阅需要的优选CDN IP，后面需要它构建节点信息
             if (!cidrParam && password === subPassword) {
-              let ips_string = await fetchWebPageContent(ipaddrURL);
+              let ips_string = "";
+              try {
+                // 读取 GitHub 私有仓库的优选IP或域名，读取不到就默认为空字符串
+                const fileContent = await fetchGitHubFile(GITHUB_TOKEN, OWNER, REPO, FILE_PATH, BRANCH);
+                const decoder = new TextDecoder('utf-8');
+                ips_string = decoder.decode(fileContent.body);
+              } catch (error) {
+                console.log(`Error: ${error.message}`);
+              }
+              // 如果读取到GitHub私有文件的内容空时，就使用ipaddrURL的IP地址
+              ips_string = ips_string !== "" ? ips_string : await fetchWebPageContent(ipaddrURL);
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map(ip => ip.trim());
               ipsArray = sortIpAddresses(ips_Array); 								 	// 按照IP排序，便于后面分页显示
             } else if (cidrParam && password === subPassword) {
@@ -846,4 +876,57 @@ function splitArrayEvenly(array, maxChunkSize) {
   const numChunks = Math.ceil(totalLength / maxChunkSize);
   const chunkSize = Math.ceil(totalLength / numChunks);
   return splitArray(array, chunkSize);
+}
+
+/**
+ * 异步函数：使用提供的GitHub访问令牌(token)和其他参数，从指定的仓库中获取文件内容。
+ * 
+ * @param {string} token - GitHub访问令牌，用于授权请求。
+ * @param {string} owner - 仓库所有者的用户名。
+ * @param {string} repo - 仓库名称。
+ * @param {string} filePath - 要获取的文件路径。
+ * @param {string} branch - 文件所在的分支名称。
+ * @returns {Object} - 包含文件内容和内容类型的对象。如果请求失败，内容为空字符串。
+ */
+async function fetchGitHubFile(token, owner, repo, filePath, branch="main") {
+  // 构建GitHub API请求URL
+  const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+
+  try {
+    // 发起GET请求到GitHub API，获取文件内容
+    const response = await fetch(githubUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `token ${token}`, // 使用访问令牌进行授权
+        'Accept': 'application/vnd.github.v3.raw', // 请求返回文件的原始内容
+        'User-Agent': 'Cloudflare Worker' // 指定用户代理，GitHub要求非浏览器用户代理标识
+      }
+    });
+
+    // 如果响应不成功，返回空字符串和文本类型
+    if (!response.ok) {
+      return {
+        body: '',
+        contentType: 'text/plain; charset=utf-8'
+      };
+    }
+
+    // 从响应头中获取实际的内容类型，如果不存在则默认为二进制流类型
+    const contentType = response.headers.get('Content-Type') || 'application/octet-stream';
+
+    // 将响应内容转换为ArrayBuffer格式，以便于后续处理
+    const body = await response.arrayBuffer();
+
+    // 返回文件内容和内容类型
+    return {
+      body: body,
+      contentType: contentType
+    };
+  } catch (error) {
+    // 如果请求过程中发生错误，返回空字符串和文本类型
+    return {
+      body: '',
+      contentType: 'text/plain; charset=utf-8'
+    };
+  }
 }

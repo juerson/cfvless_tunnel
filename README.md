@@ -78,6 +78,58 @@ https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.
 
 参数随意组合，只要参数是前面表格中的，都可以全部使用。
 
-### 四、温馨提示
+### 四、（可选）巧用GitHub的私有仓库，隐藏您的反代IP、域名
+
+如果您花费大量时间，收集一些反代IP、域名，被别人白嫖，而且您当前的网络环境抢不过别人，导致网速大不如以前，气不气？现在你不用为其烦恼，下面使用 GitHub 的私有仓库，将您收集的反代IP、域名的文件隐藏起来，只有对应的 token 才能访问，减少文件内容泄露的风险，保护您收集到的反代IP、域名。
+
+##### 4.1 设置访问GitHub私有文件所需的参数（有两种方法）
+
+- 第一种方法：在 Cloudflare Workers/Pages 中设置变量（推荐）
+
+
+| 参数             | 含义                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| GITHUB_TOKEN     | GitHub访问令牌，用于授权请求（获取方法，在后面）             |
+| GITHUB_OWNER     | 仓库所有者的用户名，填您的GitHub用户名                       |
+| GITHUB_REPO      | 私有文件所在的仓库名称                                       |
+| GITHUB_BRANCH    | 私有文件所在的分支名称，通常是main，如果您创建了其它分支，就改为您创建的分支名称 |
+| GITHUB_FILE_PATH | 私有文件所在的路径（是相对路径，不是绝对路径）               |
+
+<img src="images\在cloudflare中设置与GitHub相关的变量(参数).png" />
+
+- 第二种方法：在`_worker.js`源码中设置默认值（不推荐）
+
+  与前面设置变量效果一样，名称不同而已，该方法可能会泄露您的 GitHub token。
+
+<img src="images\在代码中设置与GitHub相关的参数.png" />
+
+注意：代码所在的行数可能跟这里不同。
+
+##### 4.2 GITHUB_TOKEN 值怎么获取？
+
+1、获取 GitHub token 的地址：[link](https://github.com/settings/tokens)
+2、获取 GitHub token 的教程
+
+- 【官方版】创建 personal access token (classic) 的教程：[link](https://docs.github.com/zh/enterprise-server@3.10/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#%E5%88%9B%E5%BB%BA-personal-access-token-classic)
+- 如何在 GitHub 生成经典的个人访问令牌(token)：[link](https://medium.com/@mbohlip/how-to-generate-a-classic-personal-access-token-in-github-04985b5432c7)
+
+##### 4.3 优选的反代IP、域名文件的格式如下
+
+```txt
+time.cloudflare.com
+time.is
+ip.sb
+172.64.229.197
+104.19.106.250
+104.19.124.30
+104.19.206.63
+104.18.200.122
+104.19.113.92
+172.64.203.72
+172.64.53.56
+```
+注意：现在不支持在文件中添加对应的端口，也不支持csv文件。
+
+### 五、温馨提示
 
 路径`src/worker.js`中的代码为开发中写的代码，大部代码根据[@zizifn](https://github.com/zizifn/edgetunnel/blob/main/src/worker-with-socks5-experimental.js)修改而来，如果不是开发者，使用`_wokers.js`的代码，简单修改一下UUID(前面提到的环境变量)，部署到cloudflare wokers或pages就可以使用。

@@ -5,6 +5,11 @@ var proxyList = ["cdn-all.xn--b6gac.eu.org", "cdn.xn--b6gac.eu.org", "cdn-b100.x
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
 var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
+var DEFAULT_GITHUB_TOKEN = "";
+var DEFAULT_OWNER = "";
+var DEFAULT_REPO = "";
+var DEFAULT_BRANCH = "main";
+var DEFAULT_FILE_PATH = "README.md";
 var clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml";
 var configPassword = "";
 var subPassword = "";
@@ -27,6 +32,11 @@ var worker_default = {
       socks5Address = env.SOCKS5 || socks5Address;
       configPassword = env.CONFIG_PASSWORD || configPassword;
       subPassword = env.SUB_PASSWORD || subPassword;
+      const GITHUB_TOKEN = env.GITHUB_TOKEN || DEFAULT_GITHUB_TOKEN;
+      const OWNER = env.GITHUB_OWNER || DEFAULT_OWNER;
+      const REPO = env.GITHUB_REPO || DEFAULT_REPO;
+      const BRANCH = env.GITHUB_BRANCH || DEFAULT_BRANCH;
+      const FILE_PATH = env.GITHUB_FILE_PATH || DEFAULT_FILE_PATH;
       if (proxyIP.includes(",")) {
         const arr = proxyIP.split(",");
         const randomIndex = Math.floor(Math.random() * arr.length);
@@ -89,11 +99,20 @@ var worker_default = {
             if (!isValidUUID(userID)) {
               throw new Error("uuid is not valid");
             }
-            let port = portParam || 443;
+            let defaultPort = hostName.endsWith("workers.dev") ? 8080 : 443;
+            let port = portParam || defaultPort;
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = [];
             if (!cidrParam && password === subPassword) {
-              let ips_string = await fetchWebPageContent(ipaddrURL);
+              let ips_string = "";
+              try {
+                const fileContent = await fetchGitHubFile(GITHUB_TOKEN, OWNER, REPO, FILE_PATH, BRANCH);
+                const decoder = new TextDecoder("utf-8");
+                ips_string = decoder.decode(fileContent.body);
+              } catch (error) {
+                console.log(`Error: ${error.message}`);
+              }
+              ips_string = ips_string !== "" ? ips_string : await fetchWebPageContent(ipaddrURL);
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
               ipsArray = sortIpAddresses(ips_Array);
             } else if (cidrParam && password === subPassword) {
@@ -693,6 +712,39 @@ function splitArrayEvenly(array, maxChunkSize) {
   const numChunks = Math.ceil(totalLength / maxChunkSize);
   const chunkSize = Math.ceil(totalLength / numChunks);
   return splitArray(array, chunkSize);
+}
+async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
+  const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+  try {
+    const response = await fetch(githubUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `token ${token}`,
+        // 使用访问令牌进行授权
+        "Accept": "application/vnd.github.v3.raw",
+        // 请求返回文件的原始内容
+        "User-Agent": "Cloudflare Worker"
+        // 指定用户代理，GitHub要求非浏览器用户代理标识
+      }
+    });
+    if (!response.ok) {
+      return {
+        body: "",
+        contentType: "text/plain; charset=utf-8"
+      };
+    }
+    const contentType = response.headers.get("Content-Type") || "application/octet-stream";
+    const body = await response.arrayBuffer();
+    return {
+      body,
+      contentType
+    };
+  } catch (error) {
+    return {
+      body: "",
+      contentType: "text/plain; charset=utf-8"
+    };
+  }
 }
 export {
   worker_default as default
