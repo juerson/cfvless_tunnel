@@ -108,6 +108,7 @@ https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.
 ##### 4.2 GITHUB_TOKEN 值怎么获取？
 
 1、获取 GitHub token 的地址：[link](https://github.com/settings/tokens)
+
 2、获取 GitHub token 的教程
 
 - 【官方版】创建 personal access token (classic) 的教程：[link](https://docs.github.com/zh/enterprise-server@3.10/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#%E5%88%9B%E5%BB%BA-personal-access-token-classic)
