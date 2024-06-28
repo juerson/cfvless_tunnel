@@ -134,3 +134,7 @@ ip.sb
 ### 五、温馨提示
 
 路径`src/worker.js`中的代码为开发中写的代码，大部代码根据[@zizifn](https://github.com/zizifn/edgetunnel/blob/main/src/worker-with-socks5-experimental.js)修改而来，如果不是开发者，使用`_wokers.js`的代码，简单修改一下UUID(前面提到的环境变量)，部署到cloudflare wokers或pages就可以使用。
+
+### 六、免责声明
+
+该项目仅供学习/研究目的，用户对法律合规和道德行为负责，作者对任何滥用行为概不负责。
