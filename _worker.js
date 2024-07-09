@@ -99,7 +99,7 @@ var worker_default = {
             if (!isValidUUID(userID)) {
               throw new Error("uuid is not valid");
             }
-            let defaultPort = hostName.endsWith("workers.dev") ? 8080 : 443;
+            let defaultPort = hostName.endsWith("workers.dev") ? 8080 : 8443;
             let port = portParam || defaultPort;
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = [];
@@ -120,7 +120,7 @@ var worker_default = {
             } else {
               return new Response("Not found", { status: 404 });
             }
-            if (target === "vless") {
+            if (target === "vless" || target === "v2ray") {
               let page = url.searchParams.get("page") || 1;
               let maxNodeNumber = url.searchParams.get("maxNode") || 1e3;
               maxNodeNumber = maxNodeNumber > 0 && maxNodeNumber <= 5e3 ? maxNodeNumber : 1e3;
@@ -150,14 +150,17 @@ var worker_default = {
               for (let i = 0; i < ipsArrayChunked.length; i++) {
                 let ipaddr = ipsArrayChunked[i];
                 let nodeName = `${ipaddr}:${port}`;
-                let tls = hostName.includes("workers.dev") ? false : true;
-                let sni = tls ? hostName : "";
-                let clashConfig2 = `  - {"type":"vless","name":"${nodeName}","server":"${ipaddr}","port":${port},"uuid":"${userID}","network":"ws","tls":${tls},"udp":false,"sni":"${sni}","client-fingerprint":"chrome","ws-opts":{"path":"${path}","headers":{"host":"${hostName}"}}}`;
+                let clashConfig2;
+                if (hostName.includes("workers.dev")) {
+                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: false, skip-cert-verify: true, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                } else {
+                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: true, skip-cert-verify: true, servername: ${hostName}, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                }
                 proxyies.push(clashConfig2);
                 nodeNameArray.push(nodeName);
               }
-              let replaceProxyies = clash_template.replace(/  - {name: 01, server: 127.0.0.1, port: 80, type: ss, cipher: aes-128-gcm, password: a123456}/g, proxyies.join("\n"));
-              let clashConfig = replaceProxyies.replace(/      - 01/g, nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
+              let replaceProxyies = clash_template.replace(new RegExp(atob("ICAtIHtuYW1lOiAwMSwgc2VydmVyOiAxMjcuMC4wLjEsIHBvcnQ6IDgwLCB0eXBlOiBzcywgY2lwaGVyOiBhZXMtMTI4LWdjbSwgcGFzc3dvcmQ6IGExMjM0NTZ9"), "g"), proxyies.join("\n"));
+              let clashConfig = replaceProxyies.replace(new RegExp(atob("ICAgICAgLSAwMQ=="), "g"), nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n"));
               return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             }
           default:

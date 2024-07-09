@@ -130,7 +130,7 @@ export default {
               throw new Error('uuid is not valid');
             }
             // 根据hostName来判断使用什么端口（非TLS/TLS端口）
-            let defaultPort = hostName.endsWith('workers.dev') ? 8080 : 443;
+            let defaultPort = hostName.endsWith('workers.dev') ? 8080 : 8443;
             let port = portParam || defaultPort;
             // 对path进行url编码，没有path参数则使用默认值
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
@@ -156,7 +156,7 @@ export default {
             } else {
               return new Response('Not found', { status: 404 }); 		 	// 密码错误，显示Not found
             }
-            if (target === "vless") {
+            if (target === "vless" || target === "v2ray") {
               /**
                * 分页创建vless节点：防止太多节点，全部生成到一个vless配置文件，导致浏览器、v2rayN等客户端卡死
                *
@@ -202,15 +202,18 @@ export default {
               for (let i = 0; i < ipsArrayChunked.length; i++) {
                 let ipaddr = ipsArrayChunked[i];
                 let nodeName = `${ipaddr}:${port}`;
-                let tls = (hostName.includes("workers.dev")) ? false : true;
-                let sni = tls ? hostName : "";
-                let clashConfig = `  - {"type":"vless","name":"${nodeName}","server":"${ipaddr}","port":${port},"uuid":"${userID}","network":"ws","tls":${tls},"udp":false,"sni":"${sni}","client-fingerprint":"chrome","ws-opts":{"path":"${path}","headers":{"host":"${hostName}"}}}`;
+                let clashConfig;
+                if (hostName.includes("workers.dev")) {
+                  clashConfig = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: false, skip-cert-verify: true, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                } else {
+                  clashConfig = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: true, skip-cert-verify: true, servername: ${hostName}, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                }
                 proxyies.push(clashConfig);
                 nodeNameArray.push(nodeName);
               }
               // 替换clash模板中的对应的字符串，生成clash配置文件
-              let replaceProxyies = clash_template.replace(/  - {name: 01, server: 127.0.0.1, port: 80, type: ss, cipher: aes-128-gcm, password: a123456}/g, proxyies.join('\n'));
-              let clashConfig = replaceProxyies.replace(/      - 01/g, nodeNameArray.map(ipWithPort => `      - ${ipWithPort}`).join("\n")).replace(/dns-failed,/g, "");
+              let replaceProxyies = clash_template.replace(new RegExp(atob("ICAtIHtuYW1lOiAwMSwgc2VydmVyOiAxMjcuMC4wLjEsIHBvcnQ6IDgwLCB0eXBlOiBzcywgY2lwaGVyOiBhZXMtMTI4LWdjbSwgcGFzc3dvcmQ6IGExMjM0NTZ9"), "g"), proxyies.join('\n'));
+              let clashConfig = replaceProxyies.replace(new RegExp(atob("ICAgICAgLSAwMQ=="), "g"), nodeNameArray.map(ipWithPort => `      - ${ipWithPort}`).join("\n"));
               return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             }
           default:
@@ -888,7 +891,7 @@ function splitArrayEvenly(array, maxChunkSize) {
  * @param {string} branch - 文件所在的分支名称。
  * @returns {Object} - 包含文件内容和内容类型的对象。如果请求失败，内容为空字符串。
  */
-async function fetchGitHubFile(token, owner, repo, filePath, branch="main") {
+async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
   // 构建GitHub API请求URL
   const githubUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
 
