@@ -6,11 +6,11 @@
 
 | **变量名称**    | **说明**                                                     |
 | --------------- | ------------------------------------------------------------ |
-| UUID            | 必须的，也可以在代码中添加，比如：0648919d-8bf1-4d4c-8525-36cf487506ec |
-| SOCKS5          | 可以为空，格式：user:pass@host:port。它优选于PROXYIP         |
-| PROXYIP         | 可以为空，或代码中修改，格式：域名或IP地址。比如：cdn.xn--b6gac.eu.org、cdn-all.xn--b6gac.eu.org、cdn-b100.xn--b6gac.eu.org等。 |
-| CONFIG_PASSWORD | 查看节点配置的密码(这里指vless以及对应的clash.meta配置)，默认为空，无密码；使用：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
-| SUB_PASSWORD    | 查看节点订阅的密码，默认为空，无密码；使用：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}` |
+| UUID            | (可选) 可用为空，在代码中修改，比如：0648919d-8bf1-4d4c-8525-36cf487506ec |
+| SOCKS5          | (可选) 可以为空，格式：user:pass@host:port。它优选于PROXYIP  |
+| PROXYIP         | (可选) 可以为空，在代码中修改，格式：域名或IP地址。比如：cdn.xn--b6gac.eu.org、cdn-all.xn--b6gac.eu.org、cdn-b100.xn--b6gac.eu.org等。 |
+| CONFIG_PASSWORD | (可选) 查看节点配置的密码(这里指vless以及对应的clash.meta配置)，默认为空，无密码；使用：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
+| SUB_PASSWORD    | (可选) 查看节点订阅的密码，默认为空，无密码；使用：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}` |
 
 使用Pages部署的，在`设置 >> 环境变量 >> 制作 >> 添加变量`中，添加前面的5个变量。
 
@@ -36,8 +36,8 @@ https://a.abc.workers.dev/config?pwd=123456  # 假如123456是CF后台中，环�
 
 | 参数     | 含义                                                         |
 | -------- | ------------------------------------------------------------ |
-| pwd      | (必须) 查看订阅的密码，密码是CF后台中环境变量SUB_PASSWORD设置的值 |
-| target   | (必须) target=vless：vless链接的订阅；target=clash：clash配置的订阅 |
+| pwd      | (必选/可选) 查看订阅的密码，CF后台中，设置了SUB_PASSWORD变量值，就要传入pwd={SUB_PASSWORD} |
+| target   | (必选) target=vless 或 target=v2ray：v2ray订阅；target=clash：clash配置的订阅 |
 | page     | (可选) 页码，默认为1，显示哪一页的vless或clash订阅内容？超出页码显示"Not found"，对传入cidr参数的值无效(更新订阅就能更换节点)。 |
 | id       | (可选) 修改vless的uuid的值，仅用于修改订阅中UUID，不能使用新的UUID来连接这个脚本代理，几乎不用 |
 | port     | (可选) 修改vless的port值                                     |
@@ -89,11 +89,11 @@ https://a.abc.workers.dev/sub?pwd=123456&target=clash&page=3&port=2053&cidr=104.
 
 | 参数             | 含义                                                         |
 | ---------------- | ------------------------------------------------------------ |
-| GITHUB_TOKEN     | GitHub访问令牌，用于授权请求（获取方法，在后面）             |
-| GITHUB_OWNER     | 仓库所有者的用户名，填您的GitHub用户名                       |
-| GITHUB_REPO      | 私有文件所在的仓库名称                                       |
-| GITHUB_BRANCH    | 私有文件所在的分支名称，通常是main，如果您创建了其它分支，就改为您创建的分支名称 |
-| GITHUB_FILE_PATH | 私有文件所在的路径（是相对路径，不是绝对路径）               |
+| GITHUB_TOKEN     | （必选）GitHub访问令牌，用于授权请求（获取方法，在后面）     |
+| GITHUB_OWNER     | （必选）仓库所有者的用户名，填您的GitHub用户名               |
+| GITHUB_REPO      | （必选）私有文件所在的仓库名称                               |
+| GITHUB_BRANCH    | （可选）私有文件所在的分支名称，默认是main，如果您创建了其它分支，就改为您创建的分支名称 |
+| GITHUB_FILE_PATH | （必选）私有文件所在的路径（是相对路径，不是绝对路径）       |
 
 <img src="images\在cloudflare中设置与GitHub相关的变量(参数).png" />
 
