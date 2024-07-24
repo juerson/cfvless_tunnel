@@ -131,10 +131,36 @@ ip.sb
 ```
 注意：现在不支持在文件中添加对应的端口，也不支持csv文件。
 
-### 五、温馨提示
+### 五、（可选）通过path指定PROXYIP
+
+在v2rayN中，修改path的值，指定proxyip值。
+
+<img src="images\path设置proxyip.png" />
+
+域名：
+
+```
+/proxyip=speed.cloudflare.com
+```
+
+IPv4地址：
+
+```
+/proxyip=192.168.1.1
+```
+
+IPv6域名：
+
+```
+/proxyip=[fe80::c789:ece7:5079:3406]
+```
+
+注意：以上的PROXYIP，仅用于举例。
+
+### 六、温馨提示
 
 路径`src/worker.js`中的代码为开发中写的代码，大部代码根据[@zizifn](https://github.com/zizifn/edgetunnel/blob/main/src/worker-with-socks5-experimental.js)修改而来，如果不是开发者，使用`_wokers.js`的代码，简单修改一下UUID(前面提到的环境变量)，部署到cloudflare wokers或pages就可以使用。
 
-### 六、免责声明
+### 七、免责声明
 
 该项目仅供学习/研究目的，用户对法律合规和道德行为负责，作者对任何滥用行为概不负责。

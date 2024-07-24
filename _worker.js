@@ -1,7 +1,13 @@
 // src/worker.js
 import { connect } from "cloudflare:sockets";
 var userID = "0648919d-8bf1-4d4c-8525-36cf487506ec";
-var proxyList = ["cdn-all.xn--b6gac.eu.org", "cdn.xn--b6gac.eu.org", "cdn-b100.xn--b6gac.eu.org", "edgetunnel.anycast.eu.org", "cdn.anycast.eu.org"];
+var proxyList = [
+  "cdn-all.xn--b6gac.eu.org",
+  "cdn.xn--b6gac.eu.org",
+  "cdn-b100.xn--b6gac.eu.org",
+  "edgetunnel.anycast.eu.org",
+  "cdn.anycast.eu.org"
+];
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
 var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
@@ -54,15 +60,15 @@ var worker_default = {
         }
       }
       const upgradeHeader = request.headers.get("Upgrade");
+      const url = new URL(request.url);
       if (!upgradeHeader || upgradeHeader !== "websocket") {
-        const url = new URL(request.url);
         switch (url.pathname) {
           case "/":
             const randomDomain = domainList[Math.floor(Math.random() * domainList.length)];
             const redirectResponse = new Response("", {
               status: 301,
               headers: {
-                "Location": randomDomain
+                Location: randomDomain
               }
             });
             return redirectResponse;
@@ -152,21 +158,43 @@ var worker_default = {
                 let nodeName = `${ipaddr}:${port}`;
                 let clashConfig2;
                 if (hostName.includes("workers.dev")) {
-                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: false, skip-cert-verify: true, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: false, skip-cert-verify: true, network: ws, ws-opts: {path: "${decodeURIComponent(
+                    path
+                  )}", headers: {Host: ${hostName}}}}`;
                 } else {
-                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: true, skip-cert-verify: true, servername: ${hostName}, network: ws, ws-opts: {path: "${decodeURIComponent(path)}", headers: {Host: ${hostName}}}}`;
+                  clashConfig2 = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: true, skip-cert-verify: true, servername: ${hostName}, network: ws, ws-opts: {path: "${decodeURIComponent(
+                    path
+                  )}", headers: {Host: ${hostName}}}}`;
                 }
                 proxyies.push(clashConfig2);
                 nodeNameArray.push(nodeName);
               }
-              let replaceProxyies = clash_template.replace(new RegExp(atob("ICAtIHtuYW1lOiAwMSwgc2VydmVyOiAxMjcuMC4wLjEsIHBvcnQ6IDgwLCB0eXBlOiBzcywgY2lwaGVyOiBhZXMtMTI4LWdjbSwgcGFzc3dvcmQ6IGExMjM0NTZ9"), "g"), proxyies.join("\n"));
-              let clashConfig = replaceProxyies.replace(new RegExp(atob("ICAgICAgLSAwMQ=="), "g"), nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n"));
+              let replaceProxyies = clash_template.replace(
+                new RegExp(
+                  atob(
+                    "ICAtIHtuYW1lOiAwMSwgc2VydmVyOiAxMjcuMC4wLjEsIHBvcnQ6IDgwLCB0eXBlOiBzcywgY2lwaGVyOiBhZXMtMTI4LWdjbSwgcGFzc3dvcmQ6IGExMjM0NTZ9"
+                  ),
+                  "g"
+                ),
+                proxyies.join("\n")
+              );
+              let clashConfig = replaceProxyies.replace(
+                new RegExp(atob("ICAgICAgLSAwMQ=="), "g"),
+                nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join("\n")
+              );
               return new Response(clashConfig, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
             }
           default:
             return new Response("Not found", { status: 404 });
         }
       } else {
+        const pathString = url.pathname;
+        if (pathString.includes("/proxyip=")) {
+          const pathPoxyip = pathString.split("=")[1];
+          if (isValidProxyIP(pathPoxyip)) {
+            proxyIP = pathPoxyip;
+          }
+        }
         return await vlessOverWSHandler(request);
       }
     } catch (err) {
@@ -189,55 +217,57 @@ async function vlessOverWSHandler(request) {
     value: null
   };
   let isDns = false;
-  readableWebSocketStream.pipeTo(new WritableStream({
-    async write(chunk, controller) {
-      if (isDns) {
-        return await handleDNSQuery(chunk, webSocket, null, log);
-      }
-      if (remoteSocketWapper.value) {
-        const writer = remoteSocketWapper.value.writable.getWriter();
-        await writer.write(chunk);
-        writer.releaseLock();
-        return;
-      }
-      const {
-        hasError,
-        message,
-        addressType,
-        portRemote = 443,
-        addressRemote = "",
-        rawDataIndex,
-        vlessVersion = new Uint8Array([0, 0]),
-        isUDP
-      } = processVlessHeader(chunk, userID);
-      address = addressRemote;
-      portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? "udp " : "tcp "}`;
-      if (hasError) {
-        throw new Error(message);
-        return;
-      }
-      if (isUDP) {
-        if (portRemote === 53) {
-          isDns = true;
-        } else {
-          throw new Error("UDP proxy only enable for DNS which is port 53");
+  readableWebSocketStream.pipeTo(
+    new WritableStream({
+      async write(chunk, controller) {
+        if (isDns) {
+          return await handleDNSQuery(chunk, webSocket, null, log);
+        }
+        if (remoteSocketWapper.value) {
+          const writer = remoteSocketWapper.value.writable.getWriter();
+          await writer.write(chunk);
+          writer.releaseLock();
           return;
         }
+        const {
+          hasError,
+          message,
+          addressType,
+          portRemote = 443,
+          addressRemote = "",
+          rawDataIndex,
+          vlessVersion = new Uint8Array([0, 0]),
+          isUDP
+        } = processVlessHeader(chunk, userID);
+        address = addressRemote;
+        portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? "udp " : "tcp "}`;
+        if (hasError) {
+          throw new Error(message);
+          return;
+        }
+        if (isUDP) {
+          if (portRemote === 53) {
+            isDns = true;
+          } else {
+            throw new Error("UDP proxy only enable for DNS which is port 53");
+            return;
+          }
+        }
+        const vlessResponseHeader = new Uint8Array([vlessVersion[0], 0]);
+        const rawClientData = chunk.slice(rawDataIndex);
+        if (isDns) {
+          return handleDNSQuery(rawClientData, webSocket, vlessResponseHeader, log);
+        }
+        handleTCPOutBound(remoteSocketWapper, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log);
+      },
+      close() {
+        log(`readableWebSocketStream is close`);
+      },
+      abort(reason) {
+        log(`readableWebSocketStream is abort`, JSON.stringify(reason));
       }
-      const vlessResponseHeader = new Uint8Array([vlessVersion[0], 0]);
-      const rawClientData = chunk.slice(rawDataIndex);
-      if (isDns) {
-        return handleDNSQuery(rawClientData, webSocket, vlessResponseHeader, log);
-      }
-      handleTCPOutBound(remoteSocketWapper, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log);
-    },
-    close() {
-      log(`readableWebSocketStream is close`);
-    },
-    abort(reason) {
-      log(`readableWebSocketStream is abort`, JSON.stringify(reason));
-    }
-  })).catch((err) => {
+    })
+  ).catch((err) => {
     log("readableWebSocketStream pipeTo error", err);
   });
   return new Response(null, { status: 101, webSocket: client });
@@ -282,16 +312,13 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
         const message = event.data;
         controller.enqueue(message);
       });
-      webSocketServer.addEventListener(
-        "close",
-        () => {
-          safeCloseWebSocket(webSocketServer);
-          if (readableStreamCancel) {
-            return;
-          }
-          controller.close();
+      webSocketServer.addEventListener("close", () => {
+        safeCloseWebSocket(webSocketServer);
+        if (readableStreamCancel) {
+          return;
         }
-      );
+        controller.close();
+      });
       webSocketServer.addEventListener("error", (err) => {
         log("webSocketServer has error");
         controller.error(err);
@@ -396,9 +423,7 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
       async write(chunk, controller) {
         hasIncomingData = true;
         if (webSocket.readyState !== WS_READY_STATE_OPEN) {
-          controller.error(
-            "webSocket.readyState is not open, maybe close"
-          );
+          controller.error("webSocket.readyState is not open, maybe close");
         }
         if (vlessHeader) {
           webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
@@ -475,24 +500,26 @@ async function handleDNSQuery(udpChunk, webSocket, vlessResponseHeader, log) {
     const writer = tcpSocket.writable.getWriter();
     await writer.write(udpChunk);
     writer.releaseLock();
-    await tcpSocket.readable.pipeTo(new WritableStream({
-      async write(chunk) {
-        if (webSocket.readyState === WS_READY_STATE_OPEN) {
-          if (vlessHeader) {
-            webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
-            vlessHeader = null;
-          } else {
-            webSocket.send(chunk);
+    await tcpSocket.readable.pipeTo(
+      new WritableStream({
+        async write(chunk) {
+          if (webSocket.readyState === WS_READY_STATE_OPEN) {
+            if (vlessHeader) {
+              webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
+              vlessHeader = null;
+            } else {
+              webSocket.send(chunk);
+            }
           }
+        },
+        close() {
+          log(`dns server(${dnsServer}) tcp is close`);
+        },
+        abort(reason) {
+          console.error(`dns server(${dnsServer}) tcp is abort`, reason);
         }
-      },
-      close() {
-        log(`dns server(${dnsServer}) tcp is close`);
-      },
-      abort(reason) {
-        console.error(`dns server(${dnsServer}) tcp is abort`, reason);
-      }
-    }));
+      })
+    );
   } catch (error) {
     console.error(`handleDNSQuery have exception, error: ${error.message}`);
   }
@@ -521,13 +548,7 @@ async function socks5Connect(addressType, addressRemote, portRemote, log) {
       log("please provide username/password");
       return;
     }
-    const authRequest = new Uint8Array([
-      1,
-      username.length,
-      ...encoder.encode(username),
-      password.length,
-      ...encoder.encode(password)
-    ]);
+    const authRequest = new Uint8Array([1, username.length, ...encoder.encode(username), password.length, ...encoder.encode(password)]);
     await writer.write(authRequest);
     res = (await reader.read()).value;
     if (res[0] !== 1 || res[1] !== 0) {
@@ -722,9 +743,9 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
     const response = await fetch(githubUrl, {
       method: "GET",
       headers: {
-        "Authorization": `token ${token}`,
+        Authorization: `token ${token}`,
         // 使用访问令牌进行授权
-        "Accept": "application/vnd.github.v3.raw",
+        Accept: "application/vnd.github.v3.raw",
         // 请求返回文件的原始内容
         "User-Agent": "Cloudflare Worker"
         // 指定用户代理，GitHub要求非浏览器用户代理标识
@@ -748,6 +769,10 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
       contentType: "text/plain; charset=utf-8"
     };
   }
+}
+function isValidProxyIP(ip) {
+  var reg = /(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|^\[((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){1,7}:)|(([0-9A-Fa-f]{1,4}:){1,6}(:[0-9A-Fa-f]{1,4}|:){1,2})|(([0-9A-Fa-f]{1,4}:){1,5}((:[0-9A-Fa-f]{1,4}){1,3}|:){1,3})|(([0-9A-Fa-f]{1,4}:){1,4}((:[0-9A-Fa-f]{1,4}){1,4}|:){1,4})|(([0-9A-Fa-f]{1,4}:){1,3}((:[0-9A-Fa-f]{1,4}){1,5}|:){1,5})|(([0-9A-Fa-f]{1,4}:){1,2}((:[0-9A-Fa-f]{1,4}){1,6}|:){1,6})|(([0-9A-Fa-f]{1,4}:){1}((:[0-9A-Fa-f]{1,4}){1,7}|:){1,7})|(:(:|([0-9A-Fa-f]{1,4}:){1,7})))(%.+)?]/;
+  return reg.test(ip);
 }
 export {
   worker_default as default
