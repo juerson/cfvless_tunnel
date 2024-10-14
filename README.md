@@ -7,8 +7,8 @@
 | **变量名称**    | **说明**                                                     |
 | --------------- | ------------------------------------------------------------ |
 | UUID            | (可选) 可用为空，在代码中修改，比如：0648919d-8bf1-4d4c-8525-36cf487506ec |
-| SOCKS5          | (可选) 可以为空，格式：user:pass@host:port。它优选于PROXYIP  |
-| PROXYIP         | (可选) 可以为空，在代码中修改，格式：域名或IP地址。比如：cdn.xn--b6gac.eu.org、cdn-all.xn--b6gac.eu.org、cdn-b100.xn--b6gac.eu.org等。 |
+| SOCKS5          | (可选) 可以为空，格式:  user:pass@host:port、:@host:port。它优选于PROXYIP |
+| PROXYIP         | (可选) 可以为空，可以在代码中修改，格式：域名、IPv4、IPv4:PORT、[IPv6]、[IPv6]:PORT |
 | CONFIG_PASSWORD | (可选) 查看节点配置的密码(这里指vless以及对应的clash.meta配置)，默认为空，无密码；使用：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
 | SUB_PASSWORD    | (可选) 查看节点订阅的密码，默认为空，无密码；使用：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}` |
 
@@ -131,9 +131,11 @@ ip.sb
 ```
 注意：现在不支持在文件中添加对应的端口，也不支持csv文件。
 
-### 五、（可选）通过path指定PROXYIP
+### 五、（可选）通过path指定PROXYIP和SOCKS5
 
-在v2rayN中，修改path的值，指定proxyip值。
+在v2rayN中，修改path的值，指定proxyip值和socks5的值（它们都支持ipv4、ipv4:port、[ipv6]、[ipv6]:port、domain.com、sub1.domain.com、sub2.sub1.domain.com、subN..sub1.domain.com格式）。
+
+##### 1、PROXYIP的path
 
 <img src="images\path设置proxyip.png" />
 
@@ -147,15 +149,35 @@ IPv4地址：
 
 ```
 /proxyip=192.168.1.1
+/proxyip=192.168.1.1:4443
 ```
 
 IPv6地址：
 
 ```
 /proxyip=[fe80::c789:ece7:5079:3406]
+/proxyip=[fe80::c789:ece7:5079:3406]:4443
 ```
 
 注意：以上的PROXYIP，仅用于举例。
+
+##### 2、SOCKS5的path
+
+<img src="images\path设置socks5.png" />
+
+用户密码认证的socks5：
+
+```
+/socks=username:password@192.168.1.1:1234
+```
+
+匿名方式的socks5（无需用户名和密码）：
+
+```
+/socks=192.168.1.1:1234
+```
+
+注意：以上的socks5，仅用于举例，还有socks5的密码含有一些特殊字符的，可能在这里设置没有用。
 
 ### 六、温馨提示
 

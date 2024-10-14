@@ -23,10 +23,11 @@ var domainList = [
   "https://www.iq.com",
   "https://www.dell.com",
   "https://www.bilibili.com",
-  "https://www.alibaba.com",
-  "https://fmovies.llc/home",
-  "https://www.visaitalia.com/",
-  "https://www.techspot.com"
+  "https://www.wix.com/",
+  "https://landingsite.ai/",
+  "https://vimeo.com/",
+  "https://www.pexels.com/",
+  "https://www.revid.ai/"
 ];
 var parsedSocks5Address = {};
 var enableSocks = false;
@@ -194,6 +195,22 @@ var worker_default = {
           if (isValidProxyIP(pathPoxyip)) {
             proxyIP = pathPoxyip;
           }
+        } else if (pathString.includes("/socks=")) {
+          const pathSocks = pathString.split("=")[1];
+          const matchSocks = (socksAddress2) => {
+            const regex = /^(?:socks:\/\/)?(?:([a-zA-Z0-9._%+-]+):([a-zA-Z0-9._%+-]+)@)?([0-9]{1,3}(?:\.[0-9]{1,3}){3}:\d+|[a-zA-Z0-9.-]+:\d+)$/;
+            const match = socksAddress2.match(regex);
+            if (match) {
+              const [_, username, password, address] = match;
+              return username && password ? `${username}:${password}@${address}` : `:@${address}`;
+            }
+            return "";
+          };
+          let socksAddress = matchSocks(pathSocks);
+          if (socksAddress.length !== 0) {
+            parsedSocks5Address = socks5AddressParser(socksAddress);
+            enableSocks = true;
+          }
         }
         return await vlessOverWSHandler(request);
       }
@@ -289,7 +306,8 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
     if (enableSocks) {
       tcpSocket = await connectAndWrite(addressRemote, portRemote, true);
     } else {
-      tcpSocket = await connectAndWrite(proxyIP || addressRemote, portRemote);
+      let porxyip_json = parseProxyIP(proxyIP);
+      tcpSocket = await connectAndWrite(porxyip_json.host || addressRemote, porxyip_json.port || portRemote);
     }
     tcpSocket.closed.catch((error) => {
       console.log("retry tcpSocket closed error", error);
@@ -773,6 +791,16 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
 function isValidProxyIP(ip) {
   var reg = /(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|^\[((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){1,7}:)|(([0-9A-Fa-f]{1,4}:){1,6}(:[0-9A-Fa-f]{1,4}|:){1,2})|(([0-9A-Fa-f]{1,4}:){1,5}((:[0-9A-Fa-f]{1,4}){1,3}|:){1,3})|(([0-9A-Fa-f]{1,4}:){1,4}((:[0-9A-Fa-f]{1,4}){1,4}|:){1,4})|(([0-9A-Fa-f]{1,4}:){1,3}((:[0-9A-Fa-f]{1,4}){1,5}|:){1,5})|(([0-9A-Fa-f]{1,4}:){1,2}((:[0-9A-Fa-f]{1,4}){1,6}|:){1,6})|(([0-9A-Fa-f]{1,4}:){1}((:[0-9A-Fa-f]{1,4}){1,7}|:){1,7})|(:(:|([0-9A-Fa-f]{1,4}:){1,7})))(%.+)?]/;
   return reg.test(ip);
+}
+function parseProxyIP(address) {
+  const regex = /^(?<ipv6>\[[0-9a-fA-F:]+\]|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})|(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}))(?::(?<port>\d+))?$/;
+  const match = address.match(regex);
+  if (!match) {
+    return { address, undefined: void 0 };
+  }
+  const host = match.groups.ipv6 || match.groups.ipv4 || match.groups.domain;
+  const port = match.groups.port ? parseInt(match.groups.port, 10) : void 0;
+  return { host, port };
 }
 export {
   worker_default as default

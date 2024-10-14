@@ -11,7 +11,7 @@ let proxyList = [
 ];
 let proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)]; // 备用代理IP地址
 
-// 备用socks5代理地址，socks5Address优先于proxyIP（格式:  user:pass@host:port）
+// 备用socks5代理地址，socks5Address优先于proxyIP（格式:  user:pass@host:port、:@host:port）
 let socks5Address = '';
 
 let ipaddrURL = 'https://ipupdate.baipiao.eu.org/'; // 网友收集的优选IP(CDN)
@@ -41,10 +41,11 @@ const domainList = [
 	'https://www.iq.com',
 	'https://www.dell.com',
 	'https://www.bilibili.com',
-	'https://www.alibaba.com',
-	'https://fmovies.llc/home',
-	'https://www.visaitalia.com/',
-	'https://www.techspot.com',
+	'https://www.wix.com/',
+	'https://landingsite.ai/',
+	'https://vimeo.com/',
+	'https://www.pexels.com/',
+	'https://www.revid.ai/',
 ];
 
 let parsedSocks5Address = {};
@@ -257,10 +258,30 @@ export default {
 				}
 				*/
 				const pathString = url.pathname;
+				// 从v2rayN客户端的path中，提取并修改原来的proxyip和socks5的地址
 				if (pathString.includes('/proxyip=')) {
 					const pathPoxyip = pathString.split('=')[1];
 					if (isValidProxyIP(pathPoxyip)) {
 						proxyIP = pathPoxyip;
+					}
+				} else if (pathString.includes('/socks=')) {
+					const pathSocks = pathString.split('=')[1];
+					const matchSocks = (socksAddress) => {
+						// 后面这些情况都能准确提取socks地址。例如：socks://127.0.0.1:8080、socks://user:pass@127.0.0.1:8080、user:pass@127.0.0.1:8080、127.0.0.1:8080
+						const regex =
+							/^(?:socks:\/\/)?(?:([a-zA-Z0-9._%+-]+):([a-zA-Z0-9._%+-]+)@)?([0-9]{1,3}(?:\.[0-9]{1,3}){3}:\d+|[a-zA-Z0-9.-]+:\d+)$/;
+						const match = socksAddress.match(regex);
+						if (match) {
+							const [_, username, password, address] = match;
+							// 返回有用户认证的"user:pass@host:port"、无用户认证的":@host:port"
+							return username && password ? `${username}:${password}@${address}` : `:@${address}`;
+						}
+						return '';
+					};
+					let socksAddress = matchSocks(pathSocks);
+					if (socksAddress.length !== 0) {
+						parsedSocks5Address = socks5AddressParser(socksAddress); // 解析socks5地址，{ username, password, hostname, port }
+						enableSocks = true; // 开启socks，使用socks5代理
 					}
 				}
 				return await vlessOverWSHandler(request);
@@ -364,7 +385,9 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 		if (enableSocks) {
 			tcpSocket = await connectAndWrite(addressRemote, portRemote, true);
 		} else {
-			tcpSocket = await connectAndWrite(proxyIP || addressRemote, portRemote);
+			// 分离ProxyIP的host和port端口（支持ipv4、ipv4:port、[ipv6]、[ipv6]:port、domain.com、sub...domain.com）
+			let porxyip_json = parseProxyIP(proxyIP);
+			tcpSocket = await connectAndWrite(porxyip_json.host || addressRemote, porxyip_json.port || portRemote);
 		}
 		tcpSocket.closed
 			.catch((error) => {
@@ -741,7 +764,7 @@ function socks5AddressParser(address) {
  * @returns {string}
  */
 function getVLESSConfig(userID, hostName) {
-	const vlessMain = `vless://${userID}@${hostName}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
+	const vlessMain = `vless://${userID}\u0040${hostName}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
 	return `
 ################################################################
 v2ray
@@ -899,9 +922,9 @@ function eachIpsArrayAndGenerateVless(ipsArray, hostName, port, path, userID) {
 		const ipaddr = ipsArray[i].trim();
 		let vlessMain;
 		if (ipaddr && hostName.includes('workers.dev')) {
-			vlessMain = `vless://${userID}@${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
+			vlessMain = `vless://${userID}\u0040${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
 		} else if (ipaddr) {
-			vlessMain = `vless://${userID}@${ipaddr}:${port}?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
+			vlessMain = `vless://${userID}\u0040${ipaddr}:${port}?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
 		}
 		if (vlessMain) {
 			vlessArray.push(vlessMain);
@@ -997,4 +1020,20 @@ function isValidProxyIP(ip) {
 	var reg =
 		/(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|^\[((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){1,7}:)|(([0-9A-Fa-f]{1,4}:){1,6}(:[0-9A-Fa-f]{1,4}|:){1,2})|(([0-9A-Fa-f]{1,4}:){1,5}((:[0-9A-Fa-f]{1,4}){1,3}|:){1,3})|(([0-9A-Fa-f]{1,4}:){1,4}((:[0-9A-Fa-f]{1,4}){1,4}|:){1,4})|(([0-9A-Fa-f]{1,4}:){1,3}((:[0-9A-Fa-f]{1,4}){1,5}|:){1,5})|(([0-9A-Fa-f]{1,4}:){1,2}((:[0-9A-Fa-f]{1,4}){1,6}|:){1,6})|(([0-9A-Fa-f]{1,4}:){1}((:[0-9A-Fa-f]{1,4}){1,7}|:){1,7})|(:(:|([0-9A-Fa-f]{1,4}:){1,7})))(%.+)?]/;
 	return reg.test(ip);
+}
+
+// 解析path输入的PROXYIP字符串，返回host和port的json值
+function parseProxyIP(address) {
+	// ipv4、ipv4:port、[ipv6]、[ipv6]:port、domain.com、sub..domain.com
+	const regex =
+		/^(?<ipv6>\[[0-9a-fA-F:]+\]|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})|(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}))(?::(?<port>\d+))?$/;
+
+	const match = address.match(regex);
+	if (!match) {
+		return { address, undefined };
+	}
+	const host = match.groups.ipv6 || match.groups.ipv4 || match.groups.domain;
+	const port = match.groups.port ? parseInt(match.groups.port, 10) : undefined;
+
+	return { host, port };
 }
