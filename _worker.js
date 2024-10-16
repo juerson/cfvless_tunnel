@@ -10,6 +10,7 @@ var proxyList = [
 ];
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
+var dohURL = "https://1.1.1.1/dns-query";
 var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
 var DEFAULT_GITHUB_TOKEN = "";
 var DEFAULT_OWNER = "";
@@ -39,6 +40,7 @@ var worker_default = {
       socks5Address = env.SOCKS5 || socks5Address;
       configPassword = env.CONFIG_PASSWORD || configPassword;
       subPassword = env.SUB_PASSWORD || subPassword;
+      dohURL = env.DOH_URL || dohURL;
       const GITHUB_TOKEN = env.GITHUB_TOKEN || DEFAULT_GITHUB_TOKEN;
       const OWNER = env.GITHUB_OWNER || DEFAULT_OWNER;
       const REPO = env.GITHUB_REPO || DEFAULT_REPO;
@@ -56,7 +58,6 @@ var worker_default = {
           parsedSocks5Address = socks5AddressParser(socks5Address);
           enableSocks = true;
         } catch (err) {
-          console.log(err.toString());
           enableSocks = false;
         }
       }
@@ -117,7 +118,6 @@ var worker_default = {
                 const decoder = new TextDecoder("utf-8");
                 ips_string = decoder.decode(fileContent.body);
               } catch (error) {
-                console.log(`Error: ${error.message}`);
               }
               ips_string = ips_string !== "" ? ips_string : await fetchWebPageContent(ipaddrURL);
               let ips_Array = ips_string.trim().split(/\r\n|\n|\r/).map((ip) => ip.trim());
@@ -234,11 +234,12 @@ async function vlessOverWSHandler(request) {
     value: null
   };
   let isDns = false;
+  let udpStreamWrite = null;
   readableWebSocketStream.pipeTo(
     new WritableStream({
       async write(chunk, controller) {
-        if (isDns) {
-          return await handleDNSQuery(chunk, webSocket, null, log);
+        if (isDns && udpStreamWrite) {
+          return udpStreamWrite(chunk);
         }
         if (remoteSocketWapper.value) {
           const writer = remoteSocketWapper.value.writable.getWriter();
@@ -273,19 +274,19 @@ async function vlessOverWSHandler(request) {
         const vlessResponseHeader = new Uint8Array([vlessVersion[0], 0]);
         const rawClientData = chunk.slice(rawDataIndex);
         if (isDns) {
-          return handleDNSQuery(rawClientData, webSocket, vlessResponseHeader, log);
+          const { write } = await handleUDPOutBound(webSocket, vlessResponseHeader, log);
+          udpStreamWrite = write;
+          udpStreamWrite(rawClientData);
+          return;
         }
         handleTCPOutBound(remoteSocketWapper, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log);
       },
       close() {
-        log(`readableWebSocketStream is close`);
       },
       abort(reason) {
-        log(`readableWebSocketStream is abort`, JSON.stringify(reason));
       }
     })
   ).catch((err) => {
-    log("readableWebSocketStream pipeTo error", err);
   });
   return new Response(null, { status: 101, webSocket: client });
 }
@@ -296,7 +297,6 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
       port
     });
     remoteSocket.value = tcpSocket2;
-    log(`connected to ${address}:${port}`);
     const writer = tcpSocket2.writable.getWriter();
     await writer.write(rawClientData);
     writer.releaseLock();
@@ -310,7 +310,6 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
       tcpSocket = await connectAndWrite(porxyip_json.host || addressRemote, porxyip_json.port || portRemote);
     }
     tcpSocket.closed.catch((error) => {
-      console.log("retry tcpSocket closed error", error);
     }).finally(() => {
       safeCloseWebSocket(webSocket);
     });
@@ -338,7 +337,6 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
         controller.close();
       });
       webSocketServer.addEventListener("error", (err) => {
-        log("webSocketServer has error");
         controller.error(err);
       });
       const { earlyData, error } = base64ToArrayBuffer(earlyDataHeader);
@@ -354,7 +352,6 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
       if (readableStreamCancel) {
         return;
       }
-      log(`ReadableStream was canceled, due to ${reason}`);
       readableStreamCancel = true;
       safeCloseWebSocket(webSocketServer);
     }
@@ -451,7 +448,6 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
         }
       },
       close() {
-        log(`remoteConnection!.readable is close with hasIncomingData is ${hasIncomingData}`);
       },
       abort(reason) {
         console.error(`remoteConnection!.readable abort`, reason);
@@ -462,7 +458,6 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
     safeCloseWebSocket(webSocket);
   });
   if (hasIncomingData === false && retry) {
-    log(`retry`);
     retry();
   }
 }
@@ -508,39 +503,54 @@ function stringify(arr, offset = 0) {
   }
   return uuid;
 }
-async function handleDNSQuery(udpChunk, webSocket, vlessResponseHeader, log) {
-  try {
-    const dnsServer = "103.247.36.36";
-    const dnsPort = 53;
-    let vlessHeader = vlessResponseHeader;
-    const tcpSocket = connect({ hostname: dnsServer, port: dnsPort });
-    log(`connected to ${dnsServer}:${dnsPort}`);
-    const writer = tcpSocket.writable.getWriter();
-    await writer.write(udpChunk);
-    writer.releaseLock();
-    await tcpSocket.readable.pipeTo(
-      new WritableStream({
-        async write(chunk) {
-          if (webSocket.readyState === WS_READY_STATE_OPEN) {
-            if (vlessHeader) {
-              webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
-              vlessHeader = null;
-            } else {
-              webSocket.send(chunk);
-            }
+async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
+  let isVlessHeaderSent = false;
+  const transformStream = new TransformStream({
+    start(controller) {
+    },
+    transform(chunk, controller) {
+      for (let index = 0; index < chunk.byteLength; ) {
+        const lengthBuffer = chunk.slice(index, index + 2);
+        const udpPakcetLength = new DataView(lengthBuffer).getUint16(0);
+        const udpData = new Uint8Array(chunk.slice(index + 2, index + 2 + udpPakcetLength));
+        index = index + 2 + udpPakcetLength;
+        controller.enqueue(udpData);
+      }
+    },
+    flush(controller) {
+    }
+  });
+  transformStream.readable.pipeTo(
+    new WritableStream({
+      async write(chunk) {
+        const resp = await fetch(dohURL, {
+          method: "POST",
+          headers: {
+            "content-type": "application/dns-message"
+          },
+          body: chunk
+        });
+        const dnsQueryResult = await resp.arrayBuffer();
+        const udpSize = dnsQueryResult.byteLength;
+        const udpSizeBuffer = new Uint8Array([udpSize >> 8 & 255, udpSize & 255]);
+        if (webSocket.readyState === WS_READY_STATE_OPEN) {
+          if (isVlessHeaderSent) {
+            webSocket.send(await new Blob([udpSizeBuffer, dnsQueryResult]).arrayBuffer());
+          } else {
+            webSocket.send(await new Blob([vlessResponseHeader, udpSizeBuffer, dnsQueryResult]).arrayBuffer());
+            isVlessHeaderSent = true;
           }
-        },
-        close() {
-          log(`dns server(${dnsServer}) tcp is close`);
-        },
-        abort(reason) {
-          console.error(`dns server(${dnsServer}) tcp is abort`, reason);
         }
-      })
-    );
-  } catch (error) {
-    console.error(`handleDNSQuery have exception, error: ${error.message}`);
-  }
+      }
+    })
+  ).catch((error) => {
+  });
+  const writer = transformStream.writable.getWriter();
+  return {
+    write(chunk) {
+      writer.write(chunk);
+    }
+  };
 }
 async function socks5Connect(addressType, addressRemote, portRemote, log) {
   const { username, password, hostname, port } = parsedSocks5Address;
@@ -548,29 +558,23 @@ async function socks5Connect(addressType, addressRemote, portRemote, log) {
   const socksGreeting = new Uint8Array([5, 2, 0, 2]);
   const writer = socket.writable.getWriter();
   await writer.write(socksGreeting);
-  log("sent socks greeting");
   const reader = socket.readable.getReader();
   const encoder = new TextEncoder();
   let res = (await reader.read()).value;
   if (res[0] !== 5) {
-    log(`socks server version error: ${res[0]} expected: 5`);
     return;
   }
   if (res[1] === 255) {
-    log("no acceptable methods");
     return;
   }
   if (res[1] === 2) {
-    log("socks server needs auth");
     if (!username || !password) {
-      log("please provide username/password");
       return;
     }
     const authRequest = new Uint8Array([1, username.length, ...encoder.encode(username), password.length, ...encoder.encode(password)]);
     await writer.write(authRequest);
     res = (await reader.read()).value;
     if (res[0] !== 1 || res[1] !== 0) {
-      log("fail to auth socks server");
       return;
     }
   }
@@ -586,17 +590,13 @@ async function socks5Connect(addressType, addressRemote, portRemote, log) {
       DSTADDR = new Uint8Array([4, ...addressRemote.split(":").flatMap((x) => [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2), 16)])]);
       break;
     default:
-      log(`invild  addressType is ${addressType}`);
       return;
   }
   const socksRequest = new Uint8Array([5, 1, 0, ...DSTADDR, portRemote >> 8, portRemote & 255]);
   await writer.write(socksRequest);
-  log("sent socks request");
   res = (await reader.read()).value;
   if (res[1] === 0) {
-    log("socks connection opened");
   } else {
-    log("fail to open socks connection");
     return;
   }
   writer.releaseLock();
@@ -762,11 +762,8 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
       method: "GET",
       headers: {
         Authorization: `token ${token}`,
-        // 使用访问令牌进行授权
         Accept: "application/vnd.github.v3.raw",
-        // 请求返回文件的原始内容
         "User-Agent": "Cloudflare Worker"
-        // 指定用户代理，GitHub要求非浏览器用户代理标识
       }
     });
     if (!response.ok) {
