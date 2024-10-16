@@ -4,9 +4,10 @@ compatibility_date = "2023-12-18"
 workers_dev = true
 
 [vars]
-UUID = "0648919d-8bf1-4d4c-8525-36cf487506ec" # 它优先于worker.js中的UUID
-SOCKS5 = ""                                   # 它优先于worker.js中的SOCKS5，同时也优先于下面的PROXYIP
-PROXYIP = ""                                  # 它优先于worker.js中的PROXYIP
+UUID = "0648919d-8bf1-4d4c-8525-36cf487506ec" # 它优先于worker.js中的userID
+SOCKS5 = ""                                   # 它优先于worker.js中的socks5Address，同时也优先于下面的PROXYIP
+PROXYIP = ""                                  # 它优先于worker.js中的proxyIP
+DOH_URL = ""                                  # 它优先于worker.js中的dohURL
 CONFIG_PASSWORD = ""                          # 查看节点的配置信息的密码，留空则公开， 所有人都能看到
 SUB_PASSWORD = ""                             # 查看节点的订阅内容的密码，留空则公开， 所有人都能看到
 GITHUB_TOKEN = ""                             # GitHub访问令牌，用于授权请求
