@@ -11,6 +11,7 @@
 | PROXYIP         | (可选) 可以为空，可以在代码中修改，格式：域名、IPv4、IPv4:PORT、[IPv6]、[IPv6]:PORT |
 | CONFIG_PASSWORD | (可选) 查看节点配置的密码(这里指vless以及对应的clash.meta配置)，默认为空，无密码；使用：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
 | SUB_PASSWORD    | (可选) 查看节点订阅的密码，默认为空，无密码；使用：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}` |
+| DOH_URL         | (可选) 填DNS over HTTPS（简称 DoH）的地址（它比DoT更加隐秘）。例如：https://1.1.1.1/dns-query、https://dns.google/dns-query |
 
 使用Pages部署的，在`设置 >> 环境变量 >> 制作 >> 添加变量`中，添加前面的5个变量。
 
@@ -149,14 +150,14 @@ IPv4地址：
 
 ```
 /proxyip=192.168.1.1
-/proxyip=192.168.1.1:4443
+/proxyip=192.168.1.1:443
 ```
 
 IPv6地址：
 
 ```
 /proxyip=[fe80::c789:ece7:5079:3406]
-/proxyip=[fe80::c789:ece7:5079:3406]:4443
+/proxyip=[fe80::c789:ece7:5079:3406]:443
 ```
 
 注意：以上的PROXYIP，仅用于举例。
@@ -168,13 +169,13 @@ IPv6地址：
 用户密码认证的socks5：
 
 ```
-/socks=username:password@192.168.1.1:1234
+/socks=user:pass@72.167.46.208:1080
 ```
 
 匿名方式的socks5（无需用户名和密码）：
 
 ```
-/socks=192.168.1.1:1234
+/socks=72.167.46.208:1080
 ```
 
 注意：以上的socks5，仅用于举例，还有socks5的密码含有一些特殊字符的，可能在这里设置没有用。
