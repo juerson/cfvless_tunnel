@@ -1,25 +1,21 @@
 // src/worker.js
 import { connect } from "cloudflare:sockets";
 var userID = "0648919d-8bf1-4d4c-8525-36cf487506ec";
-var proxyList = [
-  "cdn-all.xn--b6gac.eu.org",
-  "cdn.xn--b6gac.eu.org",
-  "cdn-b100.xn--b6gac.eu.org",
-  "edgetunnel.anycast.eu.org",
-  "cdn.anycast.eu.org"
-];
+var proxyList = ["bpb.yousef.isegaro.com", "cdn-all.xn--b6gac.eu.org", "cdn-b100.xn--b6gac.eu.org", "proxyip.sg.fxxk.dedyn.io"];
 var proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)];
 var socks5Address = "";
-var dohURL = "https://1.1.1.1/dns-query";
-var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
 var DEFAULT_GITHUB_TOKEN = "";
 var DEFAULT_OWNER = "";
 var DEFAULT_REPO = "";
 var DEFAULT_BRANCH = "main";
 var DEFAULT_FILE_PATH = "README.md";
 var clash_template_url = "https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml";
+var ipaddrURL = "https://ipupdate.baipiao.eu.org/";
+var dohURL = "https://1.1.1.1/dns-query";
 var configPassword = "";
 var subPassword = "";
+var HTTP_WITH_PORTS = [80, 8080, 8880, 2052, 2082, 2086, 2095];
+var HTTPS_WITH_PORTS = [443, 2053, 2083, 2087, 2096, 8443];
 var domainList = [
   "https://www.iq.com",
   "https://www.dell.com",
@@ -97,7 +93,7 @@ var worker_default = {
             let target = url.searchParams.get("target");
             let hostName = url.searchParams.get("hostName") || url.hostname;
             userID = url.searchParams.get("id") || userID;
-            let portParam = url.searchParams.get("port");
+            let portParam = url.searchParams.get("port") || 0;
             let pathParam = url.searchParams.get("path");
             let cidrParam = url.searchParams.get("cidr");
             if (password) {
@@ -107,8 +103,6 @@ var worker_default = {
             if (!isValidUUID(userID)) {
               throw new Error("uuid is not valid");
             }
-            let defaultPort = hostName.endsWith("workers.dev") ? 8080 : 8443;
-            let port = portParam || defaultPort;
             let path = pathParam ? encodeURIComponent(pathParam) : "%2F%3Fed%3D2048";
             let ipsArray = [];
             if (!cidrParam && password === subPassword) {
@@ -137,7 +131,7 @@ var worker_default = {
                 return new Response("Not found", { status: 404 });
               }
               let ipsArrayChunked = chunkedArray[page - 1];
-              let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, port, path, userID);
+              let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, portParam, path, userID);
               let vlessArrayStr = reusltArray.join("\n");
               let encoded = btoa(vlessArrayStr);
               return new Response(encoded, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -156,6 +150,9 @@ var worker_default = {
               let nodeNameArray = [];
               for (let i = 0; i < ipsArrayChunked.length; i++) {
                 let ipaddr = ipsArrayChunked[i];
+                let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
+                let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
+                let port = [0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes("workers.dev") || [0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes("workers.dev") ? hostName.includes("workers.dev") ? randomHttpPortElement : randomHttpsPortElement : portParam;
                 let nodeName = `${ipaddr}:${port}`;
                 let clashConfig2;
                 if (hostName.includes("workers.dev")) {
@@ -626,7 +623,8 @@ function socks5AddressParser(address) {
   return { username, password, hostname, port };
 }
 function getVLESSConfig(userID2, hostName) {
-  const vlessMain = `vless://${userID2}@${hostName}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
+  const server = "www.visa.com.sg";
+  const vlessMain = `vless://${userID2}@${server}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${server}`;
   return `
 ################################################################
 v2ray
@@ -637,8 +635,8 @@ ${vlessMain}
 clash-meta
 ---------------------------------------------------------------
 - type: vless
-  name: ${hostName}
-  server: ${hostName}
+  name: ${server}
+  server: ${server}
   port: 443
   uuid: ${userID2}
   network: ws
@@ -724,10 +722,13 @@ function getCidrParamAndGenerateIps(cidrParam) {
   const randomIps = randomIpsFromCidrList(cidrs, 1e3);
   return randomIps;
 }
-function eachIpsArrayAndGenerateVless(ipsArray, hostName, port, path, userID2) {
+function eachIpsArrayAndGenerateVless(ipsArray, hostName, portParam, path, userID2) {
   let vlessArray = [];
   for (let i = 0; i < ipsArray.length; i++) {
     const ipaddr = ipsArray[i].trim();
+    let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
+    let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
+    let port = [0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes("workers.dev") || [0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes("workers.dev") ? hostName.includes("workers.dev") ? randomHttpPortElement : randomHttpsPortElement : portParam;
     let vlessMain;
     if (ipaddr && hostName.includes("workers.dev")) {
       vlessMain = `vless://${userID2}@${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
@@ -786,18 +787,23 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = "main") {
   }
 }
 function isValidProxyIP(ip) {
-  var reg = /(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|^\[((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){1,7}:)|(([0-9A-Fa-f]{1,4}:){1,6}(:[0-9A-Fa-f]{1,4}|:){1,2})|(([0-9A-Fa-f]{1,4}:){1,5}((:[0-9A-Fa-f]{1,4}){1,3}|:){1,3})|(([0-9A-Fa-f]{1,4}:){1,4}((:[0-9A-Fa-f]{1,4}){1,4}|:){1,4})|(([0-9A-Fa-f]{1,4}:){1,3}((:[0-9A-Fa-f]{1,4}){1,5}|:){1,5})|(([0-9A-Fa-f]{1,4}:){1,2}((:[0-9A-Fa-f]{1,4}){1,6}|:){1,6})|(([0-9A-Fa-f]{1,4}:){1}((:[0-9A-Fa-f]{1,4}){1,7}|:){1,7})|(:(:|([0-9A-Fa-f]{1,4}:){1,7})))(%.+)?]/;
+  var reg = /^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d{1,5})?|(?:(?:\d{1,3}\.){3}\d{1,3})(?::\d{1,5})?|(?:\[[0-9a-fA-F:]+\])(?::\d{1,5})?)$/;
   return reg.test(ip);
 }
 function parseProxyIP(address) {
-  const regex = /^(?<ipv6>\[[0-9a-fA-F:]+\]|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})|(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}))(?::(?<port>\d+))?$/;
+  const regex = /^(?:(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})(?::(?<port>\d{1,5}))?|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})(?::(?<port_ipv4>\d{1,5}))?|(?<ipv6>\[[0-9a-fA-F:]+\])(?::(?<port_ipv6>\d{1,5}))?)$/;
   const match = address.match(regex);
-  if (!match) {
-    return { address, undefined: void 0 };
+  if (match) {
+    let host = match.groups.domain || match.groups.ipv4 || match.groups.ipv6;
+    let port = match.groups.port || match.groups.port_ipv4 || match.groups.port_ipv6 || void 0;
+    return { host, port };
+  } else {
+    return { host: "", undefined: void 0 };
   }
-  const host = match.groups.ipv6 || match.groups.ipv4 || match.groups.domain;
-  const port = match.groups.port ? parseInt(match.groups.port, 10) : void 0;
-  return { host, port };
+}
+function getRandomElement(array) {
+  const randomIndex = Math.floor(Math.random() * array.length);
+  return array[randomIndex];
 }
 export {
   worker_default as default

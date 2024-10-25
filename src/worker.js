@@ -2,21 +2,11 @@ import { connect } from 'cloudflare:sockets';
 
 let userID = '0648919d-8bf1-4d4c-8525-36cf487506ec'; // 备用UUID
 
-let proxyList = [
-	'cdn-all.xn--b6gac.eu.org',
-	'cdn.xn--b6gac.eu.org',
-	'cdn-b100.xn--b6gac.eu.org',
-	'edgetunnel.anycast.eu.org',
-	'cdn.anycast.eu.org',
-];
+let proxyList = ['bpb.yousef.isegaro.com', 'cdn-all.xn--b6gac.eu.org', 'cdn-b100.xn--b6gac.eu.org', 'proxyip.sg.fxxk.dedyn.io'];
 let proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)]; // 备用代理IP地址
 
 // 备用socks5代理地址，socks5Address优先于proxyIP（格式:  user:pass@host:port、:@host:port）
 let socks5Address = '';
-
-let dohURL = 'https://1.1.1.1/dns-query';
-
-let ipaddrURL = 'https://ipupdate.baipiao.eu.org/'; // 网友收集的优选IP(CDN)
 
 // —————————————————————————————————————————— 该参数用于访问GitHub的私有仓库文件 ——————————————————————————————————————————
 const DEFAULT_GITHUB_TOKEN = ''; // GitHub的令牌
@@ -27,6 +17,8 @@ const DEFAULT_FILE_PATH = 'README.md'; // GitHub的文件路径
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
 let clash_template_url = 'https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml'; // clash模板
+let ipaddrURL = 'https://ipupdate.baipiao.eu.org/'; // 网友收集的优选IP(CDN)
+let dohURL = 'https://1.1.1.1/dns-query';
 
 /**
  * 1、查看节点配置信息的密码：http://your_worker_domain/config?pwd={CONFIG_PASSWORD}
@@ -38,6 +30,9 @@ let clash_template_url = 'https://raw.githubusercontent.com/juerson/cfvless_tunn
  */
 let configPassword = ''; // 备用
 let subPassword = ''; // 备用
+
+const HTTP_WITH_PORTS = [80, 8080, 8880, 2052, 2082, 2086, 2095];
+const HTTPS_WITH_PORTS = [443, 2053, 2083, 2087, 2096, 8443];
 
 const domainList = [
 	'https://www.iq.com',
@@ -127,7 +122,7 @@ export default {
 						let target = url.searchParams.get('target'); // (必须的)接收target参数，指向什么订阅？vless or clash?
 						let hostName = url.searchParams.get('hostName') || url.hostname; // 接收hostName参数，没有则使用当前网页的域名，可选的（填充到vless中的sni和host）
 						userID = url.searchParams.get('id') || userID; // 接收id参数，没有则使用默认值，可选的
-						let portParam = url.searchParams.get('port'); // 接收port参数，可选的
+						let portParam = url.searchParams.get('port') || 0; // 接收port参数，可选的
 						let pathParam = url.searchParams.get('path'); // 接收path参数，可选的
 						let cidrParam = url.searchParams.get('cidr'); // 就收cidr参数，可选的，如：cidr=104.21.192.0/19,104.21.64.0/19
 
@@ -139,9 +134,6 @@ export default {
 						if (!isValidUUID(userID)) {
 							throw new Error('uuid is not valid');
 						}
-						// 根据hostName来判断使用什么端口（非TLS/TLS端口）
-						let defaultPort = hostName.endsWith('workers.dev') ? 8080 : 8443;
-						let port = portParam || defaultPort;
 						// 对path进行url编码，没有path参数则使用默认值
 						let path = pathParam ? encodeURIComponent(pathParam) : '%2F%3Fed%3D2048';
 						let ipsArray = []; // 后面vless、clash中要使用到
@@ -190,7 +182,7 @@ export default {
 							// 使用哪个子数组的数据？
 							let ipsArrayChunked = chunkedArray[page - 1];
 							// 遍历ipsArray生成vless链接
-							let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, port, path, userID);
+							let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, portParam, path, userID);
 							let vlessArrayStr = reusltArray.join('\n');
 							// base64编码
 							let encoded = btoa(vlessArrayStr);
@@ -214,6 +206,16 @@ export default {
 							let nodeNameArray = [];
 							for (let i = 0; i < ipsArrayChunked.length; i++) {
 								let ipaddr = ipsArrayChunked[i];
+
+								let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
+								let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
+								let port =
+									([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes('workers.dev')) ||
+									([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes('workers.dev'))
+										? hostName.includes('workers.dev')
+											? randomHttpPortElement
+											: randomHttpsPortElement
+										: portParam;
 								let nodeName = `${ipaddr}:${port}`;
 								let clashConfig;
 								if (hostName.includes('workers.dev')) {
@@ -310,7 +312,6 @@ async function vlessOverWSHandler(request) {
 		value: null,
 	};
 	let isDns = false;
-	// 新添的
 	let udpStreamWrite = null;
 	readableWebSocketStream
 		.pipeTo(
@@ -393,7 +394,7 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 		if (enableSocks) {
 			tcpSocket = await connectAndWrite(addressRemote, portRemote, true);
 		} else {
-			// 分离ProxyIP的host和port端口（支持ipv4、ipv4:port、[ipv6]、[ipv6]:port、domain.com、sub...domain.com）
+			// 分离ProxyIP的host和port端口
 			let porxyip_json = parseProxyIP(proxyIP);
 			tcpSocket = await connectAndWrite(porxyip_json.host || addressRemote, porxyip_json.port || portRemote);
 		}
@@ -797,7 +798,8 @@ function socks5AddressParser(address) {
  * @returns {string}
  */
 function getVLESSConfig(userID, hostName) {
-	const vlessMain = `vless://${userID}\u0040${hostName}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
+	const server = 'www.visa.com.sg';
+	const vlessMain = `vless://${userID}\u0040${server}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${server}`;
 	return `
 ################################################################
 v2ray
@@ -808,8 +810,8 @@ ${vlessMain}
 clash-meta
 ---------------------------------------------------------------
 - type: vless
-  name: ${hostName}
-  server: ${hostName}
+  name: ${server}
+  server: ${server}
   port: 443
   uuid: ${userID}
   network: ws
@@ -949,10 +951,19 @@ function getCidrParamAndGenerateIps(cidrParam) {
  * @param {string} userID - uuid
  * @returns {Array} - 返回vless的数组
  */
-function eachIpsArrayAndGenerateVless(ipsArray, hostName, port, path, userID) {
+function eachIpsArrayAndGenerateVless(ipsArray, hostName, portParam, path, userID) {
 	let vlessArray = [];
 	for (let i = 0; i < ipsArray.length; i++) {
 		const ipaddr = ipsArray[i].trim();
+		let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
+		let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
+		let port =
+			([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes('workers.dev')) ||
+			([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes('workers.dev'))
+				? hostName.includes('workers.dev')
+					? randomHttpPortElement
+					: randomHttpsPortElement
+				: portParam;
 		let vlessMain;
 		if (ipaddr && hostName.includes('workers.dev')) {
 			vlessMain = `vless://${userID}\u0040${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
@@ -1048,25 +1059,32 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = 'main') {
 	}
 }
 
-// 检查是否为域名(含子域名)、IPv4地址、[IPv6地址]中任意一个？
+// 检查是否为"(子)域名、IPv4、[IPv6]、(子)域名:端口、IPv4:端口、[IPv6]:端口"中任意一个？
 function isValidProxyIP(ip) {
 	var reg =
-		/(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|^\[((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){1,7}:)|(([0-9A-Fa-f]{1,4}:){1,6}(:[0-9A-Fa-f]{1,4}|:){1,2})|(([0-9A-Fa-f]{1,4}:){1,5}((:[0-9A-Fa-f]{1,4}){1,3}|:){1,3})|(([0-9A-Fa-f]{1,4}:){1,4}((:[0-9A-Fa-f]{1,4}){1,4}|:){1,4})|(([0-9A-Fa-f]{1,4}:){1,3}((:[0-9A-Fa-f]{1,4}){1,5}|:){1,5})|(([0-9A-Fa-f]{1,4}:){1,2}((:[0-9A-Fa-f]{1,4}){1,6}|:){1,6})|(([0-9A-Fa-f]{1,4}:){1}((:[0-9A-Fa-f]{1,4}){1,7}|:){1,7})|(:(:|([0-9A-Fa-f]{1,4}:){1,7})))(%.+)?]/;
+		/^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d{1,5})?|(?:(?:\d{1,3}\.){3}\d{1,3})(?::\d{1,5})?|(?:\[[0-9a-fA-F:]+\])(?::\d{1,5})?)$/;
 	return reg.test(ip);
 }
 
 // 解析path输入的PROXYIP字符串，返回host和port的json值
 function parseProxyIP(address) {
-	// ipv4、ipv4:port、[ipv6]、[ipv6]:port、domain.com、sub..domain.com
+	// 匹配地址格式：(子)域名、IPv4、[IPv6]、(子)域名:端口、IPv4:端口、[IPv6]:端口
 	const regex =
-		/^(?<ipv6>\[[0-9a-fA-F:]+\]|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})|(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}))(?::(?<port>\d+))?$/;
+		/^(?:(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})(?::(?<port>\d{1,5}))?|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})(?::(?<port_ipv4>\d{1,5}))?|(?<ipv6>\[[0-9a-fA-F:]+\])(?::(?<port_ipv6>\d{1,5}))?)$/;
 
 	const match = address.match(regex);
-	if (!match) {
-		return { address, undefined };
-	}
-	const host = match.groups.ipv6 || match.groups.ipv4 || match.groups.domain;
-	const port = match.groups.port ? parseInt(match.groups.port, 10) : undefined;
 
-	return { host, port };
+	if (match) {
+		let host = match.groups.domain || match.groups.ipv4 || match.groups.ipv6;
+		let port = match.groups.port || match.groups.port_ipv4 || match.groups.port_ipv6 || undefined;
+
+		return { host, port };
+	} else {
+		return { host: '', undefined };
+	}
+}
+
+function getRandomElement(array) {
+	const randomIndex = Math.floor(Math.random() * array.length);
+	return array[randomIndex];
 }
