@@ -8,7 +8,7 @@
 | --------------- | ------------------------------------------------------------ |
 | UUID            | (可选) 可用为空，在代码中修改，比如：0648919d-8bf1-4d4c-8525-36cf487506ec |
 | SOCKS5          | (可选) 可以为空，格式:  user:pass@host:port、:@host:port。它优选于PROXYIP |
-| PROXYIP         | (可选) 可以为空，可以在代码中修改，格式：域名、IPv4、IPv4:PORT、[IPv6]、[IPv6]:PORT |
+| PROXYIP         | (可选) 可以为空，可以在代码中修改，格式：(Sub-)Domain:PORT、IPv4:PORT、[IPv6]:PORT（没有端口，默认是443端口） |
 | CONFIG_PASSWORD | (可选) 查看节点配置的密码(这里指vless以及对应的clash.meta配置)，默认为空，无密码；使用：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
 | SUB_PASSWORD    | (可选) 查看节点订阅的密码，默认为空，无密码；使用：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}` |
 | DOH_URL         | (可选) 填DNS over HTTPS（简称 DoH）的地址（它比DoT更加隐秘）。例如：https://1.1.1.1/dns-query、https://dns.google/dns-query |
@@ -144,6 +144,7 @@ ip.sb
 
 ```
 /proxyip=speed.cloudflare.com
+/proxyip=speed.cloudflare.com:443
 ```
 
 IPv4地址：

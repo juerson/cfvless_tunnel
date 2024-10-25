@@ -1,4 +1,4 @@
-name = "cfvless_tunnel_worker"
+name = "cfvless-tunnel-worker"
 main = "src/worker.js"
 compatibility_date = "2023-12-18"
 workers_dev = true

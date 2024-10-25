@@ -1,5 +1,5 @@
 {
-  "name": "cfvless_tunnel_worker",
+  "name": "cfvless-tunnel-worker",
   "version": "0.0.0",
   "private": true,
   "scripts": {
