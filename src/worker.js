@@ -1,11 +1,9 @@
 import { connect } from 'cloudflare:sockets';
 
 let userID = '0648919d-8bf1-4d4c-8525-36cf487506ec'; // 备用UUID
+let landingAddress = ''; // 备用代理IP地址
 
-let proxyList = ['bpb.yousef.isegaro.com', 'cdn-all.xn--b6gac.eu.org', 'cdn-b100.xn--b6gac.eu.org', 'proxyip.sg.fxxk.dedyn.io'];
-let proxyIP = proxyList[Math.floor(Math.random() * proxyList.length)]; // 备用代理IP地址
-
-// 备用socks5代理地址，socks5Address优先于proxyIP（格式:  user:pass@host:port、:@host:port）
+// 备用socks5代理地址，socks5Address优先于landingAddress（格式:  user:pass@host:port、:@host:port）
 let socks5Address = '';
 
 // —————————————————————————————————————————— 该参数用于访问GitHub的私有仓库文件 ——————————————————————————————————————————
@@ -16,17 +14,17 @@ const DEFAULT_BRANCH = 'main'; // GitHub的分支名
 const DEFAULT_FILE_PATH = 'README.md'; // GitHub的文件路径
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
-let clash_template_url = 'https://raw.githubusercontent.com/juerson/cfvless_tunnel/master/clash_template.yaml'; // clash模板
-let ipaddrURL = 'https://ipupdate.baipiao.eu.org/'; // 网友收集的优选IP(CDN)
-let dohURL = 'https://1.1.1.1/dns-query';
+let clashTemplateUrl = 'https://raw.githubusercontent.com/juerson/cfvless_tunnel/refs/heads/master/clash_template.yaml'; // clash模板
+let ipaddrURL = 'https://raw.githubusercontent.com/juerson/cfvless_tunnel/refs/heads/master/ipaddr.txt';
+let dohURL = 'https://dns.google.com/resolve';
 
 /**
  * 1、查看节点配置信息的密码：http://your_worker_domain/config?pwd={CONFIG_PASSWORD}
  *
  * 2、查看订阅的密码：
- *        https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={vless or clash}
+ *        https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={v2 or clash}
  *    可选参数（一个或多个），顺序不固定：
- *        &page=1&id={your_vless_uuid}&port={port}&cidr={cidr}&path={your_vless_path}&hostName={your_worker_domain}
+ *        &page=1&id={your_vless_uuid}&port={port}&cidr={cidr}&path={your_vess_path}&hostName={your_worker_domain}
  */
 let configPassword = ''; // 备用
 let subPassword = ''; // 备用
@@ -51,9 +49,8 @@ let enableSocks = false;
 export default {
 	async fetch(request, env, ctx) {
 		try {
-			/** 先检查cf中的环境变量存在就使用它，不存在就使用"||"右边的 */
-			userID = env.UUID || userID;
-			proxyIP = env.PROXYIP || proxyIP;
+			userID = env.UUID4 || userID;
+			landingAddress = env.LANDING_ADDRESS || landingAddress;
 			socks5Address = env.SOCKS5 || socks5Address;
 			configPassword = env.CONFIG_PASSWORD || configPassword;
 			subPassword = env.SUB_PASSWORD || subPassword;
@@ -68,12 +65,12 @@ export default {
 			// ————————————————————————————————————————————————————————————————————————————————
 
 			// 检查字符串中是否含逗号，有的就随机从中选择一个元素
-			if (proxyIP.includes(',')) {
-				const arr = proxyIP.split(',');
+			if (landingAddress.includes(',')) {
+				const arr = landingAddress.split(',');
 				const randomIndex = Math.floor(Math.random() * arr.length);
-				proxyIP = arr[randomIndex].trim();
+				landingAddress = arr[randomIndex].trim();
 			} else {
-				proxyIP = proxyIP.trim();
+				landingAddress = landingAddress.trim();
 			}
 			if (socks5Address) {
 				try {
@@ -106,8 +103,8 @@ export default {
 						}
 						// 检查地址栏中传入的pwd密码跟环境变量的CONFIG_PASSWORD密码是否一致，一致才能查看节点的配置信息
 						if (configPassword === password) {
-							const vlessConfig = getVLESSConfig(userID, request.headers.get('Host'));
-							return new Response(`${vlessConfig}`, {
+							const baseConfig = getBaseConfig(userID, request.headers.get('Host'));
+							return new Response(`${baseConfig}`, {
 								status: 200,
 								headers: {
 									'Content-Type': 'text/plain;charset=utf-8',
@@ -119,7 +116,7 @@ export default {
 					}
 					case `/sub`:
 						let password = url.searchParams.get('pwd') || ''; // (必须的)接收pwd参数(password密码的简写)，不传入pwd参数则不能查看对应的配置信息
-						let target = url.searchParams.get('target'); // (必须的)接收target参数，指向什么订阅？vless or clash?
+						let target = url.searchParams.get('target'); // (必须的)接收target参数，指向什么订阅？v2ray or clash?
 						let hostName = url.searchParams.get('hostName') || url.hostname; // 接收hostName参数，没有则使用当前网页的域名，可选的（填充到vless中的sni和host）
 						userID = url.searchParams.get('id') || userID; // 接收id参数，没有则使用默认值，可选的
 						let portParam = url.searchParams.get('port') || 0; // 接收port参数，可选的
@@ -132,7 +129,7 @@ export default {
 							subPassword = encodeURIComponent(subPassword);
 						}
 						if (!isValidUUID(userID)) {
-							throw new Error('uuid is not valid');
+							throw new Error('uuid4 is not valid');
 						}
 						// 对path进行url编码，没有path参数则使用默认值
 						let path = pathParam ? encodeURIComponent(pathParam) : '%2F%3Fed%3D2048';
@@ -161,7 +158,8 @@ export default {
 						} else {
 							return new Response('Not found', { status: 404 }); // 密码错误，显示Not found
 						}
-						if (target === 'vless' || target === 'v2ray') {
+						let page = url.searchParams.get('page') || 1; // 从1开始的页码
+						if (target === 'v2' || target === base64ToUtf8('djJyYXk')) {
 							/**
 							 * 分页创建vless节点：防止太多节点，全部生成到一个vless配置文件，导致浏览器、v2rayN等客户端卡死
 							 *
@@ -169,7 +167,6 @@ export default {
 							 * maxNode参数：每页最多的节点数
 							 *
 							 */
-							let page = url.searchParams.get('page') || 1; // 从1开始的页码
 							let maxNodeNumber = url.searchParams.get('maxNode') || 1000; // 获取get请求链接中的maxNode参数(最大节点数)
 							maxNodeNumber = maxNodeNumber > 0 && maxNodeNumber <= 5000 ? maxNodeNumber : 1000; // 限制最大节点数
 							// splitArrayEvenly函数：ipArray数组分割成每个子数组都不超过maxNode的数组(子数组之间元素个数平均分配)
@@ -182,16 +179,15 @@ export default {
 							// 使用哪个子数组的数据？
 							let ipsArrayChunked = chunkedArray[page - 1];
 							// 遍历ipsArray生成vless链接
-							let reusltArray = eachIpsArrayAndGenerateVless(ipsArrayChunked, hostName, portParam, path, userID);
-							let vlessArrayStr = reusltArray.join('\n');
+							let reusltArray = eachIpsArrayAndGeneratevess(ipsArrayChunked, hostName, portParam, path, userID);
+							let vessArrayStr = reusltArray.join('\n');
 							// base64编码
-							let encoded = btoa(vlessArrayStr);
+							let encoded = btoa(vessArrayStr);
 							return new Response(encoded, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-						} else if (target === 'clash') {
+						} else if (target === base64ToUtf8('Y2xhc2g') || target === base64ToUtf8('bWlob21v')) {
 							/**
-							 * 分页创建clash配置文件，参数的意思跟前面的vless一样
+							 * 分页创建clash/mihomo配置文件，参数的意思跟前面的v2ray一样
 							 */
-							let page = url.searchParams.get('page') || 1;
 							let maxNode = url.searchParams.get('maxNode') || 300;
 							maxNode = maxNode > 0 && maxNode <= 1000 ? maxNode : 300;
 							let chunkedArray = splitArrayEvenly(ipsArray, maxNode);
@@ -200,38 +196,60 @@ export default {
 								return new Response('Not found', { status: 404 });
 							}
 							// 抓取clash配置模板
-							let clash_template = await fetchWebPageContent(clash_template_url);
+							let clashTemplate = await fetchWebPageContent(clashTemplateUrl);
 							let ipsArrayChunked = chunkedArray[page - 1];
 							let proxyies = [];
 							let nodeNameArray = [];
+
+							// clash的json配置的样子
+							const base64String =
+								'eyJ0eXBlIjoidmxlc3MiLCJuYW1lIjoiIiwic2VydmVyIjoiIiwicG9ydCI6NDQzLCJ1dWlkIjoiI3V1aWQ0IyIsIm5ldHdvcmsiOiJ3cyIsInRscyI6dHJ1ZSwidWRwIjpmYWxzZSwic2VydmVybmFtZSI6IiIsImNsaWVudC1maW5nZXJwcmludCI6ImNocm9tZSIsIndzLW9wdHMiOnsicGF0aCI6IiNwYXRoIyIsImhlYWRlcnMiOnsiSG9zdCI6IiNIb3N0IyJ9fX0';
+							// 1. 解码Base64字符串
+							const decodedString = base64ToUtf8(base64String);
+							// 2. 使用 decodeURIComponent 处理解码后的字符串
+							const uriDecodedString = decodeURIComponent(decodedString);
+
 							for (let i = 0; i < ipsArrayChunked.length; i++) {
 								let ipaddr = ipsArrayChunked[i];
 
 								let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
 								let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
 								let port =
-									([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes('workers.dev')) ||
-									([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes('workers.dev'))
-										? hostName.includes('workers.dev')
+									([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))) ||
+									([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')))
+										? hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))
 											? randomHttpPortElement
 											: randomHttpsPortElement
 										: portParam;
 								let nodeName = `${ipaddr}:${port}`;
-								let clashConfig;
-								if (hostName.includes('workers.dev')) {
-									clashConfig = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: false, skip-cert-verify: true, network: ws, ws-opts: {path: "${decodeURIComponent(
-										path
-									)}", headers: {Host: ${hostName}}}}`;
-								} else {
-									clashConfig = `  - {name: ${nodeName}, server: ${ipaddr}, port: ${port}, client-fingerprint: chrome, type: vless, uuid: ${userID}, tls: true, skip-cert-verify: true, servername: ${hostName}, network: ws, ws-opts: {path: "${decodeURIComponent(
-										path
-									)}", headers: {Host: ${hostName}}}}`;
+
+								// 3. 将解码后的字符串转换为JSON对象
+								const jsonObject = JSON.parse(uriDecodedString);
+								// 4. 修改JSON对象中的值
+								jsonObject.name = nodeName;
+								jsonObject.server = ipaddr;
+								jsonObject.port = port;
+								jsonObject.servername = hostName;
+								// 要替换的字符串(另一种方法修改)
+								let replacements = {
+									'#uuid4#': userID,
+									'#Host#': hostName,
+									'#path#': decodeURIComponent(path),
+								};
+
+								if (hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))) {
+									jsonObject.tls = false;
+									delete jsonObject.servername;
 								}
-								proxyies.push(clashConfig);
+
+								let modifiedResult = Object.entries(replacements).reduce((acc, [key, value]) => {
+									return acc.replace(new RegExp(key, 'g'), value);
+								}, `  - ${JSON.stringify(jsonObject)}`);
+								proxyies.push(modifiedResult);
 								nodeNameArray.push(nodeName);
 							}
 							// 替换clash模板中的对应的字符串，生成clash配置文件
-							let replaceProxyies = clash_template.replace(
+							let replaceProxyies = clashTemplate.replace(
 								new RegExp(
 									atob(
 										'ICAtIHtuYW1lOiAwMSwgc2VydmVyOiAxMjcuMC4wLjEsIHBvcnQ6IDgwLCB0eXBlOiBzcywgY2lwaGVyOiBhZXMtMTI4LWdjbSwgcGFzc3dvcmQ6IGExMjM0NTZ9'
@@ -245,29 +263,66 @@ export default {
 								nodeNameArray.map((ipWithPort) => `      - ${ipWithPort}`).join('\n')
 							);
 							return new Response(clashConfig, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+						} else if (target === base64ToUtf8('c2luZ2JveA')) {
+							// 以下用于生成singbox配置
+							let maxNode = url.searchParams.get('maxNode') || 50;
+							maxNode = maxNode > 0 && maxNode <= 100 ? maxNode : 50;
+							let chunkedArray = splitArrayEvenly(ipsArray, maxNode);
+							let totalPage = Math.ceil(ipsArray.length / maxNode);
+							if (page > totalPage || page < 1) {
+								return new Response('Not found', { status: 404 });
+							}
+							let ipsArrayChunked = chunkedArray[page - 1];
+							let singbxnodes = [];
+							let singbxtagname = []; // tag的名称，用于代理分组，这里省略后续相关，可以删除它
+							for (let i = 0; i < ipsArrayChunked.length; i++) {
+								let ipaddr = ipsArrayChunked[i];
+								let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
+								let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
+								let port =
+									([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))) ||
+									([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')))
+										? hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))
+											? randomHttpPortElement
+											: randomHttpsPortElement
+										: portParam;
+								let nodeName = `${ipaddr}:${port}`;
+								let onTls = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? false : true;
+								let base64JsonString =
+									'ICAgIHsNCiAgICAgICJuZXR3b3JrIjogInRjcCIsDQogICAgICAic2VydmVyIjogIiNzZXJ2ZXIjIiwNCiAgICAgICJzZXJ2ZXJfcG9ydCI6ICNwb3J0IywNCiAgICAgICJ0YWciOiAiI3RhZ25hbWUjIiwNCiAgICAgICJ0bHMiOiB7DQogICAgICAgICJlbmFibGVkIjogI29uVGxzIywNCiAgICAgICAgImluc2VjdXJlIjogdHJ1ZSwNCiAgICAgICAgInNlcnZlcl9uYW1lIjogIiNIb3N0IyIsDQogICAgICAgICJ1dGxzIjogew0KICAgICAgICAgICJlbmFibGVkIjogdHJ1ZSwNCiAgICAgICAgICAiZmluZ2VycHJpbnQiOiAiY2hyb21lIg0KICAgICAgICB9DQogICAgICB9LA0KICAgICAgInRyYW5zcG9ydCI6IHsNCiAgICAgICAgImVhcmx5X2RhdGFfaGVhZGVyX25hbWUiOiAiU2VjLVdlYlNvY2tldC1Qcm90b2NvbCIsDQogICAgICAgICJoZWFkZXJzIjogew0KICAgICAgICAgICJIb3N0IjogIiNIb3N0IyINCiAgICAgICAgfSwNCiAgICAgICAgInBhdGgiOiAiI3BhdGgjIiwNCiAgICAgICAgInR5cGUiOiAid3MiDQogICAgICB9LA0KICAgICAgInR5cGUiOiAidmxlc3MiLA0KICAgICAgInV1aWQiOiAiI3V1aWQ0IyINCiAgICB9';
+								// 要替换的字符串
+								let replacements = {
+									'#server#': ipaddr,
+									'#port#': port,
+									'#uuid4#': userID,
+									'#Host#': hostName,
+									'#onTls#': onTls,
+									'#path#': decodeURIComponent(path),
+									'#tagname#': nodeName,
+								};
+
+								let singbxNode = Object.entries(replacements).reduce((acc, [key, value]) => {
+									return acc.replace(new RegExp(key, 'g'), value);
+								}, base64ToUtf8(base64JsonString));
+								singbxnodes.push(singbxNode);
+								singbxtagname.push(nodeName);
+							}
+							let singbxconfig = base64ToUtf8('ew0KICAib3V0Ym91bmRzIjogWw0KI291dGJkcyMNCiAgXQ0KfQ').replace(
+								'#outbds#',
+								singbxnodes.join(',\n')
+							);
+							return new Response(singbxconfig, { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
 						}
 					default:
 						return new Response('Not found', { status: 404 });
 				}
 			} else {
-				/*
-				const queryString = url.pathname.slice(1);
-				const params = {};
-				queryString.split('&').forEach((pair) => {
-					const [key, value] = pair.split('=');
-					params[decodeURIComponent(key)] = decodeURIComponent(value || '');
-				});
-				const pathPoxyip = params['proxyip'];
-				if (isValidProxyIP(pathPoxyip)) {
-					proxyIP = pathPoxyip;
-				}
-				*/
 				const pathString = url.pathname;
-				// 从v2rayN客户端的path中，提取并修改原来的proxyip和socks5的地址
-				if (pathString.includes('/proxyip=')) {
-					const pathPoxyip = pathString.split('=')[1];
-					if (isValidProxyIP(pathPoxyip)) {
-						proxyIP = pathPoxyip;
+				// 从v2rayN客户端的path中，提取并修改原来的landingAddress或socks5的地址
+				if (pathString.includes('/pyip=')) {
+					const pathpathLandingaddr = pathString.split('=')[1];
+					if (isValidlandingAddress(pathpathLandingaddr)) {
+						landingAddress = pathpathLandingaddr;
 					}
 				} else if (pathString.includes('/socks=')) {
 					const pathSocks = pathString.split('=')[1];
@@ -289,7 +344,7 @@ export default {
 						enableSocks = true; // 开启socks，使用socks5代理
 					}
 				}
-				return await vlessOverWSHandler(request);
+				return await a1(request);
 			}
 		} catch (err) {
 			return new Response(err.toString());
@@ -297,7 +352,7 @@ export default {
 	},
 };
 
-async function vlessOverWSHandler(request) {
+async function a1(request) {
 	const webSocketPair = new WebSocketPair();
 	const [client, webSocket] = Object.values(webSocketPair);
 	webSocket.accept();
@@ -333,9 +388,9 @@ async function vlessOverWSHandler(request) {
 						portRemote = 443,
 						addressRemote = '',
 						rawDataIndex,
-						vlessVersion = new Uint8Array([0, 0]),
+						vessVersion = new Uint8Array([0, 0]),
 						isUDP,
-					} = processVlessHeader(chunk, userID);
+					} = processvessHeader(chunk, userID);
 					address = addressRemote;
 					portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? 'udp ' : 'tcp '}`;
 					if (hasError) {
@@ -350,15 +405,15 @@ async function vlessOverWSHandler(request) {
 							return;
 						}
 					}
-					const vlessResponseHeader = new Uint8Array([vlessVersion[0], 0]);
+					const vessResponseHeader = new Uint8Array([vessVersion[0], 0]);
 					const rawClientData = chunk.slice(rawDataIndex);
 					if (isDns) {
-						const { write } = await handleUDPOutBound(webSocket, vlessResponseHeader, log);
+						const { write } = await handleUDPOutBound(webSocket, vessResponseHeader, log);
 						udpStreamWrite = write;
 						udpStreamWrite(rawClientData);
 						return;
 					}
-					handleTCPOutBound(remoteSocketWapper, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log);
+					handleTCPOutBound(remoteSocketWapper, addressType, addressRemote, portRemote, rawClientData, webSocket, vessResponseHeader, log);
 				},
 				close() {
 					// log(`readableWebSocketStream is close`);
@@ -374,7 +429,7 @@ async function vlessOverWSHandler(request) {
 	return new Response(null, { status: 101, webSocket: client });
 }
 
-async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vlessResponseHeader, log) {
+async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portRemote, rawClientData, webSocket, vessResponseHeader, log) {
 	async function connectAndWrite(address, port, socks = false) {
 		const tcpSocket = socks
 			? await socks5Connect(addressType, address, port, log)
@@ -394,9 +449,9 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 		if (enableSocks) {
 			tcpSocket = await connectAndWrite(addressRemote, portRemote, true);
 		} else {
-			// 分离ProxyIP的host和port端口
-			let porxyip_json = parseProxyIP(proxyIP);
-			tcpSocket = await connectAndWrite(porxyip_json.host || addressRemote, porxyip_json.port || portRemote);
+			// 分离landingAddress的host和port端口
+			let pxAddressJSON = parselandingAddress(landingAddress);
+			tcpSocket = await connectAndWrite(pxAddressJSON.host || addressRemote, pxAddressJSON.port || portRemote);
 		}
 		tcpSocket.closed
 			.catch((error) => {
@@ -405,11 +460,11 @@ async function handleTCPOutBound(remoteSocket, addressType, addressRemote, portR
 			.finally(() => {
 				safeCloseWebSocket(webSocket);
 			});
-		remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, null, log);
+		remoteSocketToWS(tcpSocket, webSocket, vessResponseHeader, null, log);
 	}
 
 	let tcpSocket = await connectAndWrite(addressRemote, portRemote);
-	remoteSocketToWS(tcpSocket, webSocket, vlessResponseHeader, retry, log);
+	remoteSocketToWS(tcpSocket, webSocket, vessResponseHeader, retry, log);
 }
 
 function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
@@ -460,22 +515,22 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
 	return stream;
 }
 
-function processVlessHeader(vlessBuffer, userID) {
-	if (vlessBuffer.byteLength < 24) {
+function processvessHeader(vessBuffer, userID) {
+	if (vessBuffer.byteLength < 24) {
 		return { hasError: true, message: 'invalid data' };
 	}
-	const version = new Uint8Array(vlessBuffer.slice(0, 1));
+	const version = new Uint8Array(vessBuffer.slice(0, 1));
 	let isValidUser = false;
 	let isUDP = false;
-	if (stringify(new Uint8Array(vlessBuffer.slice(1, 17))) === userID) {
+	if (stringify(new Uint8Array(vessBuffer.slice(1, 17))) === userID) {
 		isValidUser = true;
 	}
 	if (!isValidUser) {
 		return { hasError: true, message: 'invalid user' };
 	}
 
-	const optLength = new Uint8Array(vlessBuffer.slice(17, 18))[0];
-	const command = new Uint8Array(vlessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
+	const optLength = new Uint8Array(vessBuffer.slice(17, 18))[0];
+	const command = new Uint8Array(vessBuffer.slice(18 + optLength, 18 + optLength + 1))[0];
 	if (command === 1) {
 		//
 	} else if (command === 2) {
@@ -487,10 +542,10 @@ function processVlessHeader(vlessBuffer, userID) {
 		};
 	}
 	const portIndex = 18 + optLength + 1;
-	const portBuffer = vlessBuffer.slice(portIndex, portIndex + 2);
+	const portBuffer = vessBuffer.slice(portIndex, portIndex + 2);
 	const portRemote = new DataView(portBuffer).getUint16(0);
 	let addressIndex = portIndex + 2;
-	const addressBuffer = new Uint8Array(vlessBuffer.slice(addressIndex, addressIndex + 1));
+	const addressBuffer = new Uint8Array(vessBuffer.slice(addressIndex, addressIndex + 1));
 
 	const addressType = addressBuffer[0];
 	let addressLength = 0;
@@ -499,16 +554,16 @@ function processVlessHeader(vlessBuffer, userID) {
 	switch (addressType) {
 		case 1:
 			addressLength = 4;
-			addressValue = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join('.');
+			addressValue = new Uint8Array(vessBuffer.slice(addressValueIndex, addressValueIndex + addressLength)).join('.');
 			break;
 		case 2:
-			addressLength = new Uint8Array(vlessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
+			addressLength = new Uint8Array(vessBuffer.slice(addressValueIndex, addressValueIndex + 1))[0];
 			addressValueIndex += 1;
-			addressValue = new TextDecoder().decode(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
+			addressValue = new TextDecoder().decode(vessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
 			break;
 		case 3:
 			addressLength = 16;
-			const dataView = new DataView(vlessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
+			const dataView = new DataView(vessBuffer.slice(addressValueIndex, addressValueIndex + addressLength));
 			const ipv6 = [];
 			for (let i = 0; i < 8; i++) {
 				ipv6.push(dataView.getUint16(i * 2).toString(16));
@@ -528,15 +583,15 @@ function processVlessHeader(vlessBuffer, userID) {
 		addressType,
 		portRemote,
 		rawDataIndex: addressValueIndex + addressLength,
-		vlessVersion: version,
+		vessVersion: version,
 		isUDP,
 	};
 }
 
-async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, retry, log) {
+async function remoteSocketToWS(remoteSocket, webSocket, vessResponseHeader, retry, log) {
 	let remoteChunkCount = 0;
 	let chunks = [];
-	let vlessHeader = vlessResponseHeader;
+	let vessHeader = vessResponseHeader;
 	let hasIncomingData = false;
 	await remoteSocket.readable
 		.pipeTo(
@@ -549,9 +604,9 @@ async function remoteSocketToWS(remoteSocket, webSocket, vlessResponseHeader, re
 					if (webSocket.readyState !== WS_READY_STATE_OPEN) {
 						controller.error('webSocket.readyState is not open, maybe close');
 					}
-					if (vlessHeader) {
-						webSocket.send(await new Blob([vlessHeader, chunk]).arrayBuffer());
-						vlessHeader = null;
+					if (vessHeader) {
+						webSocket.send(await new Blob([vessHeader, chunk]).arrayBuffer());
+						vessHeader = null;
 					} else {
 						webSocket.send(chunk);
 					}
@@ -589,9 +644,9 @@ function base64ToArrayBuffer(base64Str) {
 	}
 }
 
-function isValidUUID(uuid) {
+function isValidUUID(uuid4) {
 	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-	return uuidRegex.test(uuid);
+	return uuidRegex.test(uuid4);
 }
 
 const WS_READY_STATE_OPEN = 1;
@@ -637,15 +692,15 @@ function unsafeStringify(arr, offset = 0) {
 	).toLowerCase();
 }
 function stringify(arr, offset = 0) {
-	const uuid = unsafeStringify(arr, offset);
-	if (!isValidUUID(uuid)) {
-		throw TypeError('Stringified UUID is invalid');
+	const uuid4 = unsafeStringify(arr, offset);
+	if (!isValidUUID(uuid4)) {
+		throw TypeError('Stringified UUID4 is invalid');
 	}
-	return uuid;
+	return uuid4;
 }
 
-async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
-	let isVlessHeaderSent = false;
+async function handleUDPOutBound(webSocket, vessResponseHeader, log) {
+	let isvessHeaderSent = false;
 
 	const transformStream = new TransformStream({
 		start(controller) {},
@@ -681,11 +736,11 @@ async function handleUDPOutBound(webSocket, vlessResponseHeader, log) {
 					const udpSizeBuffer = new Uint8Array([(udpSize >> 8) & 0xff, udpSize & 0xff]);
 					if (webSocket.readyState === WS_READY_STATE_OPEN) {
 						// log(`doh success and dns message length is ${udpSize}`);
-						if (isVlessHeaderSent) {
+						if (isvessHeaderSent) {
 							webSocket.send(await new Blob([udpSizeBuffer, dnsQueryResult]).arrayBuffer());
 						} else {
-							webSocket.send(await new Blob([vlessResponseHeader, udpSizeBuffer, dnsQueryResult]).arrayBuffer());
-							isVlessHeaderSent = true;
+							webSocket.send(await new Blob([vessResponseHeader, udpSizeBuffer, dnsQueryResult]).arrayBuffer());
+							isvessHeaderSent = true;
 						}
 					}
 				},
@@ -797,32 +852,69 @@ function socks5AddressParser(address) {
  * @param {string | null} hostName
  * @returns {string}
  */
-function getVLESSConfig(userID, hostName) {
-	const server = 'www.visa.com.sg';
-	const vlessMain = `vless://${userID}\u0040${server}:443?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${server}`;
+function getBaseConfig(userID, hostName) {
+	let server = 'www.visa.com.sg';
+	let port = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? 8080 : 443;
+
+	let base64LinkIstls =
+		'dmxlc3M6Ly8jdXVpZDQjQCNzZXJ2ZXIjOiNwb3J0Iz9lbmNyeXB0aW9uPW5vbmUmc2VjdXJpdHk9dGxzJnNuaT0jaG9zdE5hbWUjJmZwPWNocm9tZSZhbGxvd0luc2VjdXJlPTEmdHlwZT13cyZob3N0PSNob3N0TmFtZSMmcGF0aD0jcGF0aCM';
+	let base64LinkNottls =
+		'dmxlc3M6Ly8jdXVpZDQjQCNzZXJ2ZXIjOiNwb3J0Iz9lbmNyeXB0aW9uPW5vbmUmc2VjdXJpdHk9bm9uZSZmcD1jaHJvbWUmYWxsb3dJbnNlY3VyZT0xJnR5cGU9d3MmaG9zdD0jaG9zdE5hbWUjJnBhdGg9I3BhdGgj';
+	let base64YamlsIstls =
+		'LSB0eXBlOiB2bGVzcw0KICBuYW1lOiAjc2VydmVyIw0KICBzZXJ2ZXI6ICNzZXJ2ZXIjDQogIHBvcnQ6ICNwb3J0Iw0KICB1dWlkOiAjdXVpZDQjDQogIG5ldHdvcms6IHdzDQogIHRsczogdHJ1ZQ0KICB1ZHA6IGZhbHNlDQogIHNlcnZlcm5hbWU6ICNob3N0TmFtZSMNCiAgY2xpZW50LWZpbmdlcnByaW50OiBjaHJvbWUNCiAgd3Mtb3B0czoNCiAgICBwYXRoOiAiLz9lZD0yMDQ4Ig0KICAgIGhlYWRlcnM6DQogICAgICBob3N0OiAjaG9zdE5hbWUj';
+	let base64YamlNottls =
+		'LSB0eXBlOiB2bGVzcw0KICBuYW1lOiAjc2VydmVyIw0KICBzZXJ2ZXI6ICNzZXJ2ZXIjDQogIHBvcnQ6ICNwb3J0Iw0KICB1dWlkOiAjdXVpZDQjDQogIG5ldHdvcms6IHdzDQogIHRsczogZmFsc2UNCiAgdWRwOiBmYWxzZQ0KICBjbGllbnQtZmluZ2VycHJpbnQ6IGNocm9tZQ0KICB3cy1vcHRzOg0KICAgIHBhdGg6ICIvP2VkPTIwNDgiDQogICAgaGVhZGVyczoNCiAgICAgIGhvc3Q6ICNob3N0TmFtZSM';
+	let base64JsonString =
+		'ew0KICAib3V0Ym91bmRzIjogWw0KICAgIHsNCiAgICAgICJuZXR3b3JrIjogInRjcCIsDQogICAgICAic2VydmVyIjogIiNzZXJ2ZXIjIiwNCiAgICAgICJzZXJ2ZXJfcG9ydCI6ICNwb3J0IywNCiAgICAgICJ0YWciOiAiI3NlcnZlciMiLA0KICAgICAgInRscyI6IHsNCiAgICAgICAgImVuYWJsZWQiOiAjb25UbHMjLA0KICAgICAgICAiaW5zZWN1cmUiOiB0cnVlLA0KICAgICAgICAic2VydmVyX25hbWUiOiAiI0hvc3QjIiwNCiAgICAgICAgInV0bHMiOiB7DQogICAgICAgICAgImVuYWJsZWQiOiB0cnVlLA0KICAgICAgICAgICJmaW5nZXJwcmludCI6ICJjaHJvbWUiDQogICAgICAgIH0NCiAgICAgIH0sDQogICAgICAidHJhbnNwb3J0Ijogew0KICAgICAgICAiZWFybHlfZGF0YV9oZWFkZXJfbmFtZSI6ICJTZWMtV2ViU29ja2V0LVByb3RvY29sIiwNCiAgICAgICAgImhlYWRlcnMiOiB7DQogICAgICAgICAgIkhvc3QiOiAiI0hvc3QjIg0KICAgICAgICB9LA0KICAgICAgICAicGF0aCI6ICIjcGF0aCMiLA0KICAgICAgICAidHlwZSI6ICJ3cyINCiAgICAgIH0sDQogICAgICAidHlwZSI6ICJ2bGVzcyIsDQogICAgICAidXVpZCI6ICIjdXVpZDQjIg0KICAgIH0NCiAgXQ0KfQ';
+
+	let onTls = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? false : true;
+	let base64LinkString = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? base64LinkNottls : base64LinkIstls;
+	let base64YamlString = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? base64YamlNottls : base64YamlsIstls;
+
+	let replacements = {
+		'#uuid4#': userID,
+		'#server#': server,
+		'#port#': port,
+		'#hostName#': hostName,
+		'#path#': '%2F%3Fed%3D2048',
+	};
+	let finallyLink =
+		Object.entries(replacements).reduce((acc, [key, value]) => {
+			return acc.replace(new RegExp(key, 'g'), value);
+		}, base64ToUtf8(base64LinkString)) +
+		'#' +
+		encodeURIComponent(`${server}:${port}`);
+	let finallyYaml = Object.entries(replacements).reduce((acc, [key, value]) => {
+		return acc.replace(new RegExp(key, 'g'), value);
+	}, base64ToUtf8(base64YamlString));
+
+	// 要替换的字符串
+	let replacementsSingbx = {
+		'#server#': server,
+		'#port#': port,
+		'#uuid4#': userID,
+		'#Host#': hostName,
+		'#onTls#': onTls,
+		'#path#': decodeURIComponent('%2F%3Fed%3D2048'),
+	};
+	let finallyJson = Object.entries(replacementsSingbx).reduce((acc, [key, value]) => {
+		return acc.replace(new RegExp(key, 'g'), value);
+	}, base64ToUtf8(base64JsonString));
 	return `
 ################################################################
-v2ray
+${base64ToUtf8('djJyYXk')}
 ---------------------------------------------------------------
-${vlessMain}
+${finallyLink}
 ---------------------------------------------------------------
 ################################################################
-clash-meta
+${base64ToUtf8('c2luZy1ib3g')}
 ---------------------------------------------------------------
-- type: vless
-  name: ${server}
-  server: ${server}
-  port: 443
-  uuid: ${userID}
-  network: ws
-  tls: true
-  udp: false
-  sni: ${hostName}
-  client-fingerprint: chrome
-  ws-opts:
-    path: "/?ed=2048"
-    headers:
-      host: ${hostName}
+${finallyJson}
+---------------------------------------------------------------
+################################################################
+${base64ToUtf8('Y2xhc2gubWV0YShtaWhvbW8p')}
+---------------------------------------------------------------
+${finallyYaml}
 ---------------------------------------------------------------
 ################################################################
 `;
@@ -932,7 +1024,7 @@ async function fetchWebPageContent(URL) {
  */
 function getCidrParamAndGenerateIps(cidrParam) {
 	let cidrs = [];
-	let vlessArray = [];
+	let vessArray = [];
 	if (cidrParam.includes(',')) {
 		cidrs = cidrParam.split(',');
 	} else {
@@ -948,33 +1040,48 @@ function getCidrParamAndGenerateIps(cidrParam) {
  * @param {string} hostName - sni、headers.host的地址
  * @param {string} port - 端口
  * @param {string} path - vless配置中的path
- * @param {string} userID - uuid
+ * @param {string} userID - uuid4
  * @returns {Array} - 返回vless的数组
  */
-function eachIpsArrayAndGenerateVless(ipsArray, hostName, portParam, path, userID) {
-	let vlessArray = [];
+function eachIpsArrayAndGeneratevess(ipsArray, hostName, portParam, path, userID) {
+	let resultsArray = [];
 	for (let i = 0; i < ipsArray.length; i++) {
 		const ipaddr = ipsArray[i].trim();
 		let randomHttpPortElement = getRandomElement(HTTP_WITH_PORTS);
 		let randomHttpsPortElement = getRandomElement(HTTPS_WITH_PORTS);
 		let port =
-			([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes('workers.dev')) ||
-			([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes('workers.dev'))
-				? hostName.includes('workers.dev')
+			([0, ...HTTPS_WITH_PORTS].includes(Number(portParam)) && hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))) ||
+			([0, ...HTTP_WITH_PORTS].includes(Number(portParam)) && !hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')))
+				? hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY='))
 					? randomHttpPortElement
 					: randomHttpsPortElement
 				: portParam;
-		let vlessMain;
-		if (ipaddr && hostName.includes('workers.dev')) {
-			vlessMain = `vless://${userID}\u0040${ipaddr}:${port}?encryption=none&security=none&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
-		} else if (ipaddr) {
-			vlessMain = `vless://${userID}\u0040${ipaddr}:${port}?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=${path}#${ipaddr}:${port}`;
-		}
-		if (vlessMain) {
-			vlessArray.push(vlessMain);
+		let base64LinkIstls =
+			'dmxlc3M6Ly8jdXVpZDQjQCNzZXJ2ZXIjOiNwb3J0Iz9lbmNyeXB0aW9uPW5vbmUmc2VjdXJpdHk9dGxzJnNuaT0jaG9zdE5hbWUjJmZwPWNocm9tZSZhbGxvd0luc2VjdXJlPTEmdHlwZT13cyZob3N0PSNob3N0TmFtZSMmcGF0aD0jcGF0aCM';
+		let base64LinkNottls =
+			'dmxlc3M6Ly8jdXVpZDQjQCNzZXJ2ZXIjOiNwb3J0Iz9lbmNyeXB0aW9uPW5vbmUmc2VjdXJpdHk9bm9uZSZmcD1jaHJvbWUmYWxsb3dJbnNlY3VyZT0xJnR5cGU9d3MmaG9zdD0jaG9zdE5hbWUjJnBhdGg9I3BhdGgj';
+
+		let base64LinkString = hostName.includes(base64ToUtf8('d29ya2Vycy5kZXY=')) ? base64LinkNottls : base64LinkIstls;
+
+		let replacements = {
+			'#uuid4#': userID,
+			'#server#': ipaddr,
+			'#port#': port,
+			'#hostName#': hostName,
+			'#path#': path,
+		};
+		let finallyLink =
+			Object.entries(replacements).reduce((acc, [key, value]) => {
+				return acc.replace(new RegExp(key, 'g'), value);
+			}, base64ToUtf8(base64LinkString)) +
+			'#' +
+			encodeURIComponent(`${ipaddr}:${port}`);
+
+		if (finallyLink) {
+			resultsArray.push(finallyLink);
 		}
 	}
-	return vlessArray;
+	return resultsArray;
 }
 
 /**
@@ -1060,14 +1167,14 @@ async function fetchGitHubFile(token, owner, repo, filePath, branch = 'main') {
 }
 
 // 检查是否为"(子)域名、IPv4、[IPv6]、(子)域名:端口、IPv4:端口、[IPv6]:端口"中任意一个？
-function isValidProxyIP(ip) {
+function isValidlandingAddress(ip) {
 	var reg =
 		/^(?:(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?::\d{1,5})?|(?:(?:\d{1,3}\.){3}\d{1,3})(?::\d{1,5})?|(?:\[[0-9a-fA-F:]+\])(?::\d{1,5})?)$/;
 	return reg.test(ip);
 }
 
-// 解析path输入的PROXYIP字符串，返回host和port的json值
-function parseProxyIP(address) {
+// 解析path输入的landingAddress字符串，返回host和port的json值
+function parselandingAddress(address) {
 	// 匹配地址格式：(子)域名、IPv4、[IPv6]、(子)域名:端口、IPv4:端口、[IPv6]:端口
 	const regex =
 		/^(?:(?<domain>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})(?::(?<port>\d{1,5}))?|(?<ipv4>(?:\d{1,3}\.){3}\d{1,3})(?::(?<port_ipv4>\d{1,5}))?|(?<ipv6>\[[0-9a-fA-F:]+\])(?::(?<port_ipv6>\d{1,5}))?)$/;
@@ -1087,4 +1194,12 @@ function parseProxyIP(address) {
 function getRandomElement(array) {
 	const randomIndex = Math.floor(Math.random() * array.length);
 	return array[randomIndex];
+}
+
+// 将base64加密的字符串转换为正经的字符串
+function base64ToUtf8(base64Str) {
+	let binary = atob(base64Str);
+	let bytes = new Uint8Array([...binary].map((char) => char.charCodeAt(0)));
+	let decoder = new TextDecoder();
+	return decoder.decode(bytes);
 }
