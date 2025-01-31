@@ -69,8 +69,6 @@ https://a.abc.workers.dev/sub?pwd=123456&target=v2ray&page=2&maxNode=200
 https://a.abc.workers.dev/sub?pwd=123456&target=v2ray&page=2&maxNode=500&cidr=104.30.1.0/24,108.162.255.0/24
 ```
 
-参数随意组合，只要参数是前面表格中的，都可以全部使用。
-
 #### 2、Clash订阅，使用例子：
 
 ```
@@ -101,7 +99,7 @@ https://a.abc.workers.dev/sub?pwd=123456&target=singbox&page=3&port=2053&cidr=10
 
 注意：
 
-1、参数随意组合，只要参数是前面表格中的，都可以全部使用。
+1、前面那些参数可以随意组合，只要参数是前面表格中的，都可以全部使用。
 
 2、由于订阅ipaddrURL链接的数据不是时刻维护/无私奉献分享给您，里面的地址可能不能使用，或者能使用，但是网速差的情况，就需要自己更新它，有需要的更改为自己的，或者使用下面的GitHub私有仓库解决。
 
