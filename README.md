@@ -196,10 +196,10 @@ IPv6地址：
 ```
      源码              可直接部署到cloudflare的部署代码
 src/worker.js -----------|=> dist/worker.js
-						 |=> _worker.js
+			 |=> _worker.js
 
 src/worker-基础版.js -----|=> dist/worker-基础版.js
-                         |=> _worker-基础版.js
+			 |=> _worker-基础版.js
 ```
 
 2、路径`src/`下所有代码为开发中写的源代码，大部代码根据[@zizifn](https://github.com/zizifn/edgetunnel)、[@ca110us](https://github.com/ca110us/epeius)、[@FoolVPN-ID](https://github.com/FoolVPN-ID/Nautica)修改而来，如果不是开发者，使用 `_wokers.js` 或`_worker_基础版.js`的代码，简单修改一下前面提到的环境变量，部署到cloudflare wokers或pages就可以使用。
