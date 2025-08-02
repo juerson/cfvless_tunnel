@@ -536,9 +536,9 @@ var DEFAULTS = {
     // 查看节点订阅的密码
   },
   urls: {
-    DATA_SOURCE_URL: "https://raw.githubusercontent.com/juerson/cftrojan-tunnel/refs/heads/master/domain.txt",
+    DATA_SOURCE_URL: "https://raw.githubusercontent.com/juerson/3h1_tunnel/refs/heads/master/domain.txt",
     // 数据源URL
-    CLASH_TEMPLATE_URL: "https://raw.githubusercontent.com/juerson/cftrojan-tunnel/refs/heads/master/clashTemplate.yaml"
+    CLASH_TEMPLATE_URL: "https://raw.githubusercontent.com/juerson/3h1_tunnel/refs/heads/master/clashTemplate.yaml"
     // clash模板
   }
 };

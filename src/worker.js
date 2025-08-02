@@ -46,8 +46,8 @@ const DEFAULTS = {
 		SUB_PASSWORD: '', // 查看节点订阅的密码
 	},
 	urls: {
-		DATA_SOURCE_URL: 'https://raw.githubusercontent.com/juerson/cftrojan-tunnel/refs/heads/master/domain.txt', // 数据源URL
-		CLASH_TEMPLATE_URL: 'https://raw.githubusercontent.com/juerson/cftrojan-tunnel/refs/heads/master/clashTemplate.yaml', // clash模板
+		DATA_SOURCE_URL: 'https://raw.githubusercontent.com/juerson/3h1_tunnel/refs/heads/master/domain.txt', // 数据源URL
+		CLASH_TEMPLATE_URL: 'https://raw.githubusercontent.com/juerson/3h1_tunnel/refs/heads/master/clashTemplate.yaml', // clash模板
 	},
 };
 
