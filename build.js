@@ -3,7 +3,7 @@ import { minify } from 'terser';
 import { readFile, writeFile } from 'fs/promises';
 
 const entries = ['src/worker-基础版.js', 'src/worker.js'];
-const entry = entries[0]; // 手动改为0或1
+const entry = entries[1]; // 手动改为0或1
 const baseName = entry.split('/').pop().replace('.js', '');
 
 const builds = [
