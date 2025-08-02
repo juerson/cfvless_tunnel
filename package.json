@@ -1,14 +1,18 @@
 {
-  "name": "cfvless-tunnel-worker",
+  "name": "3h1-tunnel",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "npm run build && wrangler deploy _worker.js",
     "dev": "wrangler dev",
-    "start": "wrangler dev"
+    "start": "wrangler dev",
+    "build": "node build.js"
   },
   "devDependencies": {
     "@jridgewell/sourcemap-codec": "^1.5.0",
-    "@rollup/plugin-inject": "^5.0.5"
+    "@rollup/plugin-inject": "^5.0.5",
+    "esbuild": "^0.25.8",
+    "terser": "^5.43.1"
   }
 }
