@@ -5,13 +5,13 @@
 | **变量名称**    | **说明**                                                     |
 | --------------- | ------------------------------------------------------------ |
 | UUID4           | (必选) 用于Vless协议的userID，例如：61098bdc-b734-4874-9e87-d18b1ef1cfaf |
-| USERPWD         | (可选) 用于Trojan协议password，在环境变量中设置，没有设置就是采用上面设置那个UUID4 |
+| USERPWD         | (可选) 用于Trojan协议的password，在环境变量中设置，没有设置就是采用上面设置那个UUID4 |
 | ENABLED_S5      | (可选) 用于开启Shadowsocks协议，默认是关闭，不能使用它，慎用，由于无密码认证，域名一旦泄露，别人会盗用你的CF Workers使用量，启用它的有效值范围：['1', 'true', 'yes', 'on'] |
 | LANDING_ADDRESS | (可选) 等价于大家公认的PROXYIP，改一个名字而已，不设置它，一些网站无法打开，格式：(Sub-)Domain:PORT、IPv4:PORT、[IPv6]:PORT（没有端口，默认是443端口） |
-| SOCKS5          | (可选) 不设置，一些网站无法打开，格式:  user:pass@host:port、:@host:port。它优选于LANDING_ADDRESS和NAT64 |
-| NAT64           | (可选) 兜底的PROXYIP替换方法，代码中设置的那个无效了，刚部署的，不能访问CF和CF保护的CDN站点 |
+| SOCKS5          | (可选) 不设置，一些网站无法打开，格式:  user:pass@host:port、:@host:port。它优先于LANDING_ADDRESS和NAT64，节点path中设置的`/pyip`或`/socks`为最高优先级 |
+| NAT64           | (可选) 兜底的PROXYIP替换方法，代码中设置的那个无效了，刚部署的，不能访问CF和CF保护的CDN站点（chatgpt、Netflix等这些站点） |
 | CONFIG_PASSWORD | (可选) 订阅版专用，用于查看v2ray、singbox、clash的配置例子，使用示例：`http://your_worker_domain/config?pwd={CONFIG_PASSWORD}` |
-| SUB_PASSWORD    | (可选) 订阅版专用，用于查看订阅内容或导入对应的客户端使用（支持v2ray、singbox、clash三种订阅方式）。使用示例：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={v2ray or clash}`，注意：订阅中所用到的DATA_SOURCE_URL数据要修改成自己的，要不然订阅的内容一直都会不变的，也可能不能使用。 |
+| SUB_PASSWORD    | (可选) 订阅版专用，用于查看订阅内容或导入对应的客户端使用（支持v2ray、singbox、clash三种订阅方式）。使用示例：`https://your_worker_domain/sub?pwd={SUB_PASSWORD}&target={v2ray, singbox, clash}`，注意：订阅中所用到的DATA_SOURCE_URL数据要修改成自己的，要不然订阅的内容一直都不变的，也可能不能使用。 |
 | GITHUB_TOKEN     | (非必须) 订阅版专用，Github token                                 |
 | GITHUB_OWNER     | (非必须) 订阅版专用，仓库拥有者                                    |
 | GITHUB_REPO      | (非必须) 订阅版专用，仓库名                                        |
@@ -23,7 +23,9 @@
 
 <img src="images\基础参数设置.png" />
 
-### 2、部署订阅版的代码，能设置的环境变量，除了前面哪些变量外，还需要设置：
+### 2、部署订阅版的代码，能设置的环境变量，除了前面哪些变量外，还能设置：
+
+非必要设置，不设置，节点有被别人查看和使用的风险，特别是`/sub?pwd=`、`/config?pwd=`没有设置密码，还部署了订阅版的代码。
 
 <img src="images\订阅版需添加的参数.png" />
 
@@ -192,7 +194,7 @@ IPv6地址：
 1、关于订阅版和基础版部署代码，要清楚自己部署那个代码。
 
 ```
-     源码              可直接部署到cloudflare的部署js文件
+     源码              可直接部署到cloudflare的部署代码
 src/worker.js -----------|=> dist/worker.js
 						 |=> _worker.js
 
