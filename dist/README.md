@@ -1,1 +1,0 @@
-This folder contains the built output assets for the worker "cfvless-tunnel-worker" generated at 2025-01-31T06:43:59.421Z.
