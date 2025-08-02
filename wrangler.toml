@@ -1,17 +1,25 @@
-name = "cfvless-tunnel-worker"
+name = "3h1-tunnel"
 main = "src/worker.js"
 compatibility_date = "2023-12-18"
 workers_dev = true
 
 [vars]
-UUID4 = "0648919d-8bf1-4d4c-8525-36cf487506ec" # 它优先于worker.js中的userID
-SOCKS5 = ""                                    # 它优先于worker.js中的socks5Address，同时也优先于下面的landingAddress
-LANDING_ADDRESS = ""                           # 它优先于worker.js中的landingAddress
-DOH_URL = ""                                   # 它优先于worker.js中的dohURL
-CONFIG_PASSWORD = ""                           # 查看节点的配置信息的密码，留空则公开， 所有人都能看到
-SUB_PASSWORD = ""                              # 查看节点的订阅内容的密码，留空则公开， 所有人都能看到
-GITHUB_TOKEN = ""                              # GitHub访问令牌，用于授权请求
-GITHUB_OWNER = ""                              # GitHub仓库所有者的用户名
-GITHUB_REPO = ""                               # GitHub私有文件所在的仓库名称
-GITHUB_BRANCH = "main"                         # GitHub私有文件所在的分支名称
-GITHUB_FILE_PATH = "yx.txt"                    # GitHub私有文件路径(相对路径)，例如：README、yx.txt、cf/yx.txt等
+UUID4 = "61098bdc-b734-4874-9e87-d18b1ef1cfaf"   # vless，它优先于worker.js中的userID
+USERPWD = "61098bdc-b734-4874-9e87-d18b1ef1cfaf" # trojan，没有设置这个值，就使用前面的UUID4
+ENABLED_S5 = ""                                  # ss，可选['1', 'true', 'yes', 'on']启用ss协议，没有设置该变量值，默认是关闭，慎用
+# SOCKS5和PROXYIP
+SOCKS5 = ""                                      # 它优先于worker.js中的socks5Address，同时也优先于下面的LANDING_ADDRESS（PROXYIP）
+LANDING_ADDRESS = ""                             # 它优先于worker.js中的landingAddress，该参数就是大家公认的PROXYIP
+NAT64 = ""									 										 # 既无设置socks5也无设置proxyip，就使用它兜底，NAT64地址的前缀(记得去掉/96)
+# 订阅版-访问密码
+CONFIG_PASSWORD = ""                             # 查看节点的配置信息的密码，留空则公开， 所有人都能看到
+SUB_PASSWORD = ""                                # 查看节点的订阅内容的密码，留空则公开， 所有人都能看到
+# 订阅版-用于访问GitHub的文件数据
+GITHUB_TOKEN = ""                                # GitHub访问令牌，用于授权请求
+GITHUB_OWNER = ""                                # GitHub仓库所有者的用户名
+GITHUB_REPO = ""                                 # GitHub私有文件所在的仓库名称
+GITHUB_BRANCH = "main"                           # GitHub私有文件所在的分支名称
+GITHUB_FILE_PATH = ""                            # GitHub私有文件路径(相对路径)，例如：README.md、yx.txt、cf/yx.txt等
+# 订阅版-ip地址数据源URL(要改就添加DATA_SOURCE_URL)
+DATA_SOURCE_URL = ""													 # 既没有传入cidr参数值，也没有GitHub私有文件的数据，就使用这里的https://的txt文件数据
+# CLASH_TEMPLATE_URL = ""												 # clash模板文件地址，注意：以前的模板不能使用了，要修改部分内容。
