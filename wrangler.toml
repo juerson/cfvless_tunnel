@@ -22,4 +22,4 @@ GITHUB_BRANCH = "main"                           # GitHub私有文件所在的�
 GITHUB_FILE_PATH = ""                            # GitHub私有文件路径(相对路径)，例如：README.md、yx.txt、cf/yx.txt等
 # 订阅版-ip地址数据源URL(要改就添加DATA_SOURCE_URL)
 DATA_SOURCE_URL = ""                             # 既没有传入cidr参数值，也没有GitHub私有文件的数据，就使用这里的https://的txt文件数据
-# CLASH_TEMPLATE_URL = ""												 # clash模板文件地址，注意：以前的模板不能使用了，要修改部分内容。
+# CLASH_TEMPLATE_URL = ""                        # clash模板文件地址，注意：以前的模板不能使用了，要修改部分内容。
